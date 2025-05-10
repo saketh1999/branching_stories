@@ -108,16 +108,6 @@ const ComicPanelView: FC<ComicPanelViewProps> = ({ panel, onGenerateNext, onBran
                 </Tooltip>
               </TooltipProvider>
             )}
-            <TooltipProvider>
-              <Tooltip delayDuration={100}>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" onClick={() => onEditPanel(panel.id)} className="h-7 w-7">
-                    <Edit2 className="h-4 w-4 text-muted-foreground" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top"><p>Edit Panel Images</p></TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
             {(panel.userDescription || (panel.promptsUsed && panel.promptsUsed.length > 0)) && (
               <TooltipProvider>
                 <Tooltip delayDuration={300}>
@@ -163,15 +153,40 @@ const ComicPanelView: FC<ComicPanelViewProps> = ({ panel, onGenerateNext, onBran
           </div>
         ))}
       </CardContent>
-      <CardFooter className="p-3 grid grid-cols-2 gap-2">
-        <Button onClick={() => onGenerateNext(panel.id)} size="sm" variant="outline" className="text-xs sm:text-sm">
-          <Sparkles className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-          Next
-        </Button>
-        <Button onClick={() => onBranch(panel.id)} size="sm" variant="outline" className="text-xs sm:text-sm">
-          <GitFork className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-          Branch
-        </Button>
+      <CardFooter className="p-3 grid grid-cols-3 gap-2">
+        <TooltipProvider>
+          <Tooltip delayDuration={100}>
+            <TooltipTrigger asChild>
+              <Button onClick={() => onGenerateNext(panel.id)} size="sm" variant="outline" className="text-xs sm:text-sm">
+                <Sparkles className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                Next
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom"><p>Generate next panel sequentially</p></TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <TooltipProvider>
+          <Tooltip delayDuration={100}>
+            <TooltipTrigger asChild>
+              <Button onClick={() => onBranch(panel.id)} size="sm" variant="outline" className="text-xs sm:text-sm">
+                <GitFork className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                Branch
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom"><p>Create a new branch from this panel</p></TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <TooltipProvider>
+          <Tooltip delayDuration={100}>
+            <TooltipTrigger asChild>
+              <Button onClick={() => onEditPanel(panel.id)} size="sm" variant="outline" className="text-xs sm:text-sm">
+                <Edit2 className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                Edit
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom"><p>Edit prompts/contexts for images in this panel</p></TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </CardFooter>
     </Card>
   );
