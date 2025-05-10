@@ -12,6 +12,12 @@ interface AddPanelArgs {
   userDescription?: string; // For initial panel
 }
 
+interface AddComicBookArgs {
+  pageImageUrls: string[]; // Array of image URLs, one for each page
+  comicBookTitle: string;
+}
+
+
 export function useStoryState() {
   const [panels, setPanels] = useState<ComicPanelData[]>([]);
   const [rootPanelId, setRootPanelId] = useState<string | null>(null);
@@ -28,6 +34,7 @@ export function useStoryState() {
     (panelId: string): ComicPanelData[] => {
       const parentPanel = getPanel(panelId);
       if (!parentPanel) return [];
+      // For group nodes, children are its pages. For regular nodes, children are subsequent panels.
       return parentPanel.childrenIds.map(childId => getPanel(childId)).filter(Boolean) as ComicPanelData[];
     },
     [panels, getPanel]
@@ -48,21 +55,19 @@ export function useStoryState() {
 
       const newPanelId = uuidv4();
       let actualParentId: string | null = intendedParentId;
-      let panelTitle = `Panel ${newPanelId.substring(0, 4)}`; // Default title
+      let panelTitle = `Panel ${newPanelId.substring(0, 4)}`; 
 
-      if (userDescription) { // This signifies an initial panel uploaded by user
+      if (userDescription) { 
         panelTitle = userDescription.substring(0, 50) + (userDescription.length > 50 ? '...' : '');
-        if (!rootPanelId) { // Very first panel of the story
+        if (!rootPanelId) { 
           actualParentId = null;
           setRootPanelId(newPanelId);
-        } else { // Subsequent "initial" panel, chain it
+        } else { 
           actualParentId = lastInitialPanelId;
         }
-      } else if (promptsUsed && promptsUsed.length > 0) { // Generated panel
+      } else if (promptsUsed && promptsUsed.length > 0) { 
         panelTitle = promptsUsed[0].substring(0, 50) + (promptsUsed[0].length > 50 ? '...' : '');
-        // actualParentId is already set correctly from intendedParentId for generated panels
       }
-
 
       const newPanel: ComicPanelData = {
         id: newPanelId,
@@ -72,6 +77,8 @@ export function useStoryState() {
         promptsUsed: promptsUsed,
         userDescription: userDescription,
         childrenIds: [],
+        isGroupNode: false,
+        isComicBookPage: false,
       };
 
       setPanels(prevPanels => {
@@ -84,7 +91,7 @@ export function useStoryState() {
         return updatedPanels;
       });
 
-      if (userDescription) { // If it was an "initial" panel type
+      if (userDescription || !actualParentId) { 
         setLastInitialPanelId(newPanelId);
       }
       
@@ -93,10 +100,65 @@ export function useStoryState() {
     [rootPanelId, lastInitialPanelId] 
   );
 
+  const addComicBook = useCallback(
+    ({ pageImageUrls, comicBookTitle }: AddComicBookArgs): string => {
+      if (pageImageUrls.length === 0) {
+        throw new Error("Cannot create a comic book with no pages.");
+      }
+
+      const comicBookRootId = uuidv4();
+      const comicBookRootPanel: ComicPanelData = {
+        id: comicBookRootId,
+        imageUrls: [], // Group node might not have its own images, or could show a cover
+        title: comicBookTitle.trim() || `Comic Book ${comicBookRootId.substring(0,4)}`,
+        userDescription: `Comic Book: ${comicBookTitle.trim()}`,
+        parentId: rootPanelId ? lastInitialPanelId : null,
+        childrenIds: [], // Will be populated with page IDs
+        isGroupNode: true,
+        isComicBookPage: false,
+      };
+
+      const pagePanelsToAdd: ComicPanelData[] = pageImageUrls.map((imageUrl, index) => {
+        const pageId = uuidv4();
+        comicBookRootPanel.childrenIds.push(pageId);
+        return {
+          id: pageId,
+          imageUrls: [imageUrl],
+          title: `Page ${index + 1}`,
+          promptsUsed: [`Page ${index + 1} of "${comicBookTitle}"`], // Auto-prompt for page
+          parentId: comicBookRootId,
+          childrenIds: [],
+          isGroupNode: false,
+          isComicBookPage: true,
+          pageNumber: index + 1,
+        };
+      });
+      
+      setPanels(prevPanels => {
+        let updatedPanels = [...prevPanels, comicBookRootPanel, ...pagePanelsToAdd];
+        if (comicBookRootPanel.parentId) {
+          updatedPanels = updatedPanels.map(p =>
+            p.id === comicBookRootPanel.parentId ? { ...p, childrenIds: [...p.childrenIds, comicBookRootId] } : p
+          );
+        }
+        return updatedPanels;
+      });
+
+      if (!rootPanelId && !comicBookRootPanel.parentId) {
+        setRootPanelId(comicBookRootId);
+      }
+      setLastInitialPanelId(comicBookRootId); // The new comic book group is the latest "initial" item
+
+      return comicBookRootId;
+    },
+    [rootPanelId, lastInitialPanelId]
+  );
+
+
   const updatePanelTitle = useCallback((panelId: string, newTitle: string) => {
     setPanels(prevPanels =>
       prevPanels.map(p =>
-        p.id === panelId ? { ...p, title: newTitle.trim() || `Panel ${p.id.substring(0,4)}` } : p
+        p.id === panelId ? { ...p, title: newTitle.trim() || (p.isComicBookPage ? `Page ${p.pageNumber}` : `Panel ${p.id.substring(0,4)}`) } : p
       )
     );
   }, []);
@@ -107,15 +169,22 @@ export function useStoryState() {
         prevPanels.map(panel => {
           if (panel.id === panelId) {
             const updatedImageUrls = [...panel.imageUrls];
+            if (imageIndex < 0 || imageIndex >= updatedImageUrls.length) {
+              console.error(`Invalid imageIndex ${imageIndex} for panel ${panelId} with ${updatedImageUrls.length} images.`);
+              return panel; // Do not modify if index is out of bounds
+            }
             updatedImageUrls[imageIndex] = newImageUrl;
 
             let updatedPromptsUsed = panel.promptsUsed ? [...panel.promptsUsed] : Array(updatedImageUrls.length).fill('');
             if (newPromptText !== undefined) {
-              // Ensure promptsUsed array is long enough
               while(updatedPromptsUsed.length < updatedImageUrls.length) {
                 updatedPromptsUsed.push('');
               }
-              updatedPromptsUsed[imageIndex] = newPromptText;
+               if (imageIndex < updatedPromptsUsed.length) {
+                 updatedPromptsUsed[imageIndex] = newPromptText;
+               } else {
+                 console.warn(`Prompt index ${imageIndex} out of bounds during single image update for panel ${panelId}`);
+               }
             }
             
             return { ...panel, imageUrls: updatedImageUrls, promptsUsed: updatedPromptsUsed };
@@ -133,9 +202,7 @@ export function useStoryState() {
         prevPanels.map(panel => {
           if (panel.id === panelId) {
             const updatedImageUrls = [...panel.imageUrls];
-            // Initialize prompts array carefully based on existing or new length
             let updatedPromptsUsed = panel.promptsUsed ? [...panel.promptsUsed] : Array(panel.imageUrls.length).fill('');
-             // Ensure promptsUsed array is long enough to accommodate all images
             while(updatedPromptsUsed.length < panel.imageUrls.length) {
                 updatedPromptsUsed.push('');
             }
@@ -143,11 +210,10 @@ export function useStoryState() {
             updates.forEach(update => {
               if (update.imageIndex >= 0 && update.imageIndex < updatedImageUrls.length) {
                 updatedImageUrls[update.imageIndex] = update.newImageUrl;
-                // Ensure specific index exists before assignment
                 if (update.imageIndex < updatedPromptsUsed.length) {
                     updatedPromptsUsed[update.imageIndex] = update.newPromptText;
-                } else { // This case should ideally not be hit if lengths are managed properly
-                    console.warn(`Prompt index ${update.imageIndex} out of bounds for panel ${panelId}`);
+                } else { 
+                    console.warn(`Prompt index ${update.imageIndex} out of bounds during batch update for panel ${panelId}`);
                 }
               }
             });
@@ -172,12 +238,14 @@ export function useStoryState() {
     panels,
     rootPanelId,
     addPanel,
+    addComicBook,
     getPanel,
     getChildren,
     resetStory,
     updatePanelTitle,
     updatePanelImage,
-    updatePanelImages, // Export new function
+    updatePanelImages, 
     lastInitialPanelId, 
   };
 }
+

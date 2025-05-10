@@ -7,5 +7,8 @@ export interface ComicPanelData {
   userDescription?: string; // For initial uploaded panel, single description for all its images.
   parentId: string | null;
   childrenIds: string[];
+  isGroupNode?: boolean; // True if this panel represents a group of other panels (e.g., a comic book)
+  isComicBookPage?: boolean; // True if this panel is a page within a comic book group
+  pageNumber?: number; // The page number if isComicBookPage is true
 }
 
