@@ -44,8 +44,8 @@ const RegenerateImageDialog: FC<RegenerateImageDialogProps> = ({
   onImageRegenerated 
 }) => {
   const [newPromptText, setNewPromptText] = useState('');
-  const [contextImageUrl, setContextImageUrl] = useState<string | null>(null); // For AI
-  const [contextImagePreviewUrl, setContextImagePreviewUrl] = useState<string | null>(null); // For dialog display
+  const [contextImageUrl, setContextImageUrl] = useState<string | null>(null);
+  const [contextImagePreviewUrl, setContextImagePreviewUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSetContextImageDialogOpen, setIsSetContextImageDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -56,7 +56,6 @@ const RegenerateImageDialog: FC<RegenerateImageDialogProps> = ({
       setContextImageUrl(imageDetails.originalImageUrl);
       setContextImagePreviewUrl(imageDetails.originalImageUrl);
     } else {
-      // Reset on close or if imageDetails is null
       setNewPromptText('');
       setContextImageUrl(null);
       setContextImagePreviewUrl(null);
@@ -103,7 +102,6 @@ const RegenerateImageDialog: FC<RegenerateImageDialogProps> = ({
   };
 
   const handleClose = () => {
-    // No need to reset states here if useEffect handles it based on isOpen and imageDetails
     onClose();
   };
 
@@ -114,79 +112,93 @@ const RegenerateImageDialog: FC<RegenerateImageDialogProps> = ({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-        <DialogContent className="sm:max-w-lg bg-card">
+        <DialogContent className="w-full max-w-xs sm:max-w-lg bg-card">
           <DialogHeader>
-            <DialogTitle className="text-xl text-primary">
+            <DialogTitle className="text-lg sm:text-xl text-primary">
               Regenerate Image {imageDetails.imageIndex + 1}
               {imageDetails.panelTitle && ` for "${imageDetails.panelTitle.substring(0,20)}..."`}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs sm:text-sm">
               Modify the prompt and/or context image to regenerate this specific image.
             </DialogDescription>
           </DialogHeader>
           
-          <div className="grid gap-4 py-4">
-            <div className="flex justify-center items-center gap-4">
-              <div className="w-1/2 space-y-1">
+          <div className="grid gap-3 sm:gap-4 py-4">
+            <div className="flex flex-col xs:flex-row justify-center items-center gap-2 sm:gap-4">
+              <div className="w-full xs:w-1/2 space-y-1">
                 <Label className="text-xs text-muted-foreground">Original Image</Label>
                 <div className="aspect-square relative bg-muted rounded border overflow-hidden">
-                  <Image src={imageDetails.originalImageUrl} alt="Original image to regenerate" layout="fill" objectFit="contain" data-ai-hint="original image thumbnail"/>
+                  <Image 
+                    src={imageDetails.originalImageUrl} 
+                    alt="Original image to regenerate" 
+                    layout="fill" 
+                    objectFit="contain" 
+                    data-ai-hint="original image thumbnail"
+                    sizes="(max-width: 400px) 80vw, 200px"
+                    />
                 </div>
               </div>
-              <div className="w-1/2 space-y-1">
+              <div className="w-full xs:w-1/2 space-y-1">
                 <Label className="text-xs text-muted-foreground">Context for AI (Click to change)</Label>
                 <div 
                   className="aspect-square relative bg-muted rounded border overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary"
                   onClick={() => setIsSetContextImageDialogOpen(true)}
                 >
                   {contextImagePreviewUrl ? (
-                     <Image src={contextImagePreviewUrl} alt="Context for AI" layout="fill" objectFit="contain" data-ai-hint="context image thumbnail"/>
+                     <Image 
+                        src={contextImagePreviewUrl} 
+                        alt="Context for AI" 
+                        layout="fill" 
+                        objectFit="contain" 
+                        data-ai-hint="context image thumbnail"
+                        sizes="(max-width: 400px) 80vw, 200px"
+                        />
                   ): (
                     <div className="flex items-center justify-center h-full text-muted-foreground">
-                        <ImageIcon className="w-8 h-8"/>
+                        <ImageIcon className="w-6 h-6 sm:w-8 sm:h-8"/>
                     </div>
                   )}
                 </div>
               </div>
             </div>
-             <div className="flex items-center justify-end gap-2 -mt-2">
+             <div className="flex flex-col xs:flex-row items-stretch xs:items-center justify-end gap-1 sm:gap-2 -mt-1 sm:-mt-2">
                 {isContextCustom && (
-                    <Button onClick={handleClearCustomContext} variant="ghost" size="sm" className="text-xs text-destructive hover:text-destructive/80">
+                    <Button onClick={handleClearCustomContext} variant="ghost" size="sm" className="text-[10px] sm:text-xs text-destructive hover:text-destructive/80 h-7 sm:h-8 px-2">
                         <RotateCcw className="mr-1 h-3 w-3" /> Use Original as Context
                     </Button>
                 )}
-                <Button onClick={() => setIsSetContextImageDialogOpen(true)} variant="outline" size="sm" className="text-xs">
+                <Button onClick={() => setIsSetContextImageDialogOpen(true)} variant="outline" size="sm" className="text-[10px] sm:text-xs h-7 sm:h-8 px-2">
                     <ImageIcon className="mr-1 h-3 w-3" /> {isContextCustom ? "Change Custom Context" : "Set Custom Context"}
                 </Button>
             </div>
 
-
             <div>
-              <Label htmlFor="new-prompt" className="text-foreground font-semibold">New Prompt</Label>
+              <Label htmlFor="new-prompt" className="text-sm sm:text-base text-foreground font-semibold">New Prompt</Label>
               <Textarea
                 id="new-prompt"
                 placeholder="Describe the changes or the new scene..."
                 value={newPromptText}
                 onChange={(e) => setNewPromptText(e.target.value)}
                 rows={3}
-                className="text-foreground mt-1"
+                className="text-foreground mt-1 text-sm"
               />
               {imageDetails.originalPrompt && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  Original prompt: "{imageDetails.originalPrompt.substring(0, 50)}{imageDetails.originalPrompt.length > 50 ? '...' : ''}"
+                  Original prompt: "{imageDetails.originalPrompt.substring(0, 40)}{imageDetails.originalPrompt.length > 40 ? '...' : ''}"
                 </p>
               )}
             </div>
           </div>
 
-          <DialogFooter className="mt-2">
+          <DialogFooter className="mt-2 flex flex-col sm:flex-row gap-2 sm:gap-0">
             <DialogClose asChild>
-              <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={handleClose} className="w-full sm:w-auto">Cancel</Button>
             </DialogClose>
             <Button 
               type="button" 
               onClick={handleRegenerate} 
               disabled={isGenerating || !newPromptText.trim() || !contextImageUrl}
+              className="w-full sm:w-auto"
             >
               {isGenerating ? ( <Loader2 className="mr-2 h-4 w-4 animate-spin" /> ) : ( <Sparkles className="mr-2 h-4 w-4" /> )}
               Regenerate Image
@@ -200,7 +212,7 @@ const RegenerateImageDialog: FC<RegenerateImageDialogProps> = ({
           isOpen={isSetContextImageDialogOpen}
           onClose={() => setIsSetContextImageDialogOpen(false)}
           allPanels={allPanels}
-          parentPanelId={imageDetails.panelId} // Pass current panel's ID
+          parentPanelId={imageDetails.panelId}
           onContextImageSelected={handleContextImageSelected}
         />
       )}

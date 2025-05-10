@@ -6,7 +6,7 @@ import AppHeader from '@/components/layout/AppHeader';
 import WelcomeMessage from '@/components/WelcomeMessage';
 import FlowchartDisplay from '@/components/story/FlowchartDisplay';
 import UploadInitialPanelDialog from '@/components/dialogs/UploadInitialPanelDialog';
-import UploadComicBookDialog from '@/components/dialogs/UploadComicBookDialog'; // New Dialog
+import UploadComicBookDialog from '@/components/dialogs/UploadComicBookDialog';
 import GeneratePanelDialog from '@/components/dialogs/GeneratePanelDialog';
 import RegenerateImageDialog, { type RegenerateImageDetails } from '@/components/dialogs/RegenerateImageDialog';
 import EditPanelDialog from '@/components/dialogs/EditPanelDialog';
@@ -14,13 +14,14 @@ import { useStoryState } from '@/hooks/useStoryState';
 import type { ComicPanelData } from '@/types/story';
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from 'lucide-react';
+import { ThemeProvider } from '@/components/ThemeProvider'; // Ensure ThemeProvider is imported
 
 export default function Home() {
   const { panels, rootPanelId, addPanel, addComicBook, getPanel, resetStory, updatePanelTitle, updatePanelImage, updatePanelImages } = useStoryState();
   const { toast } = useToast();
 
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
-  const [isUploadComicBookDialogOpen, setIsUploadComicBookDialogOpen] = useState(false); // New state
+  const [isUploadComicBookDialogOpen, setIsUploadComicBookDialogOpen] = useState(false);
   const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false);
   const [selectedPanelForGeneration, setSelectedPanelForGeneration] = useState<ComicPanelData | null>(null);
   const [isProcessingFile, setIsProcessingFile] = useState(false);
@@ -36,7 +37,7 @@ export default function Home() {
     setIsUploadDialogOpen(true);
   }, []);
 
-  const handleUploadComicBook = useCallback(() => { // New handler
+  const handleUploadComicBook = useCallback(() => {
     setIsUploadComicBookDialogOpen(true);
   }, []);
 
@@ -165,88 +166,90 @@ export default function Home() {
 
 
   return (
-    <div className="flex flex-col min-h-screen bg-background text-foreground antialiased">
-      <AppHeader 
-        onUploadInitialPanel={handleUploadInitialPanel}
-        onUploadComicBook={handleUploadComicBook} // Pass new handler
-        onNewStory={handleNewStory}
-        hasStory={!!rootPanelId}
-      />
-      <main className="flex-1 overflow-hidden relative">
-        {isProcessingFile && (
-          <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center z-50">
-            <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-            <p className="text-lg text-foreground">Processing your content...</p>
-          </div>
-        )}
-        {!rootPanelId && !isProcessingFile && (
-          <div className="flex items-center justify-center h-full">
-            <WelcomeMessage onUploadInitial={handleUploadInitialPanel} onUploadComicBook={handleUploadComicBook} />
-          </div>
-        )}
-        {rootPanelId && !isProcessingFile && (
-          <FlowchartDisplay
-            panels={panels}
-            rootId={rootPanelId}
-            onGenerateNext={handleOpenGenerateDialog}
-            onBranch={handleOpenGenerateDialog} 
-            onUpdateTitle={handleUpdatePanelTitle}
-            onRegenerateImage={handleOpenRegenerateImageDialog}
-            onEditPanel={handleOpenEditPanelDialog}
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <div className="flex flex-col min-h-screen bg-background text-foreground antialiased">
+        <AppHeader 
+          onUploadInitialPanel={handleUploadInitialPanel}
+          onUploadComicBook={handleUploadComicBook}
+          onNewStory={handleNewStory}
+          hasStory={!!rootPanelId}
+        />
+        <main className="flex-1 overflow-hidden relative">
+          {isProcessingFile && (
+            <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center z-50 p-4">
+              <Loader2 className="h-10 w-10 sm:h-12 sm:w-12 animate-spin text-primary mb-3 sm:mb-4" />
+              <p className="text-md sm:text-lg text-foreground text-center">Processing your content...</p>
+            </div>
+          )}
+          {!rootPanelId && !isProcessingFile && (
+            <div className="flex items-center justify-center h-full p-4">
+              <WelcomeMessage onUploadInitial={handleUploadInitialPanel} onUploadComicBook={handleUploadComicBook} />
+            </div>
+          )}
+          {rootPanelId && !isProcessingFile && (
+            <FlowchartDisplay
+              panels={panels}
+              rootId={rootPanelId}
+              onGenerateNext={handleOpenGenerateDialog}
+              onBranch={handleOpenGenerateDialog} 
+              onUpdateTitle={handleUpdatePanelTitle}
+              onRegenerateImage={handleOpenRegenerateImageDialog}
+              onEditPanel={handleOpenEditPanelDialog}
+            />
+          )}
+        </main>
+
+        <UploadInitialPanelDialog
+          isOpen={isUploadDialogOpen}
+          onClose={() => setIsUploadDialogOpen(false)}
+          onUpload={processUploadedFiles}
+        />
+
+        <UploadComicBookDialog
+          isOpen={isUploadComicBookDialogOpen}
+          onClose={() => setIsUploadComicBookDialogOpen(false)}
+          onUpload={processUploadedComicBook}
+        />
+        
+        {selectedPanelForGeneration && (
+          <GeneratePanelDialog
+            isOpen={isGenerateDialogOpen}
+            onClose={() => {
+              setIsGenerateDialogOpen(false);
+              setSelectedPanelForGeneration(null);
+            }}
+            parentPanel={selectedPanelForGeneration}
+            allPanels={panels}
+            onPanelGenerated={handlePanelGenerated}
           />
         )}
-      </main>
 
-      <UploadInitialPanelDialog
-        isOpen={isUploadDialogOpen}
-        onClose={() => setIsUploadDialogOpen(false)}
-        onUpload={processUploadedFiles}
-      />
+        {selectedImageForRegeneration && (
+          <RegenerateImageDialog
+            isOpen={isRegenerateImageDialogOpen}
+            onClose={() => {
+              setIsRegenerateImageDialogOpen(false);
+              setSelectedImageForRegeneration(null);
+            }}
+            imageDetails={selectedImageForRegeneration}
+            allPanels={panels}
+            onImageRegenerated={handleImageRegenerated}
+          />
+        )}
 
-      <UploadComicBookDialog
-        isOpen={isUploadComicBookDialogOpen}
-        onClose={() => setIsUploadComicBookDialogOpen(false)}
-        onUpload={processUploadedComicBook}
-      />
-      
-      {selectedPanelForGeneration && (
-        <GeneratePanelDialog
-          isOpen={isGenerateDialogOpen}
-          onClose={() => {
-            setIsGenerateDialogOpen(false);
-            setSelectedPanelForGeneration(null);
-          }}
-          parentPanel={selectedPanelForGeneration}
-          allPanels={panels}
-          onPanelGenerated={handlePanelGenerated}
-        />
-      )}
-
-      {selectedImageForRegeneration && (
-        <RegenerateImageDialog
-          isOpen={isRegenerateImageDialogOpen}
-          onClose={() => {
-            setIsRegenerateImageDialogOpen(false);
-            setSelectedImageForRegeneration(null);
-          }}
-          imageDetails={selectedImageForRegeneration}
-          allPanels={panels}
-          onImageRegenerated={handleImageRegenerated}
-        />
-      )}
-
-      {panelForEditing && (
-        <EditPanelDialog
-          isOpen={isEditPanelDialogOpen}
-          onClose={() => {
-            setIsEditPanelDialogOpen(false);
-            setPanelForEditing(null);
-          }}
-          panelToEdit={panelForEditing}
-          allPanels={panels}
-          onPanelImagesUpdated={handlePanelImagesUpdated}
-        />
-      )}
-    </div>
+        {panelForEditing && (
+          <EditPanelDialog
+            isOpen={isEditPanelDialogOpen}
+            onClose={() => {
+              setIsEditPanelDialogOpen(false);
+              setPanelForEditing(null);
+            }}
+            panelToEdit={panelForEditing}
+            allPanels={panels}
+            onPanelImagesUpdated={handlePanelImagesUpdated}
+          />
+        )}
+      </div>
+    </ThemeProvider>
   );
 }

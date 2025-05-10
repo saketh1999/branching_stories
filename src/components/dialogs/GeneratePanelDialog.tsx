@@ -15,9 +15,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Sparkles, Wand2, Loader2, PlusCircle, XCircle, ImageIcon, UploadCloud, RotateCcw } from 'lucide-react';
 import SuggestedPromptsDisplay from './SuggestedPromptsDisplay';
-import SetContextImageDialog from './SetContextImageDialog'; // New dialog
+import SetContextImageDialog from './SetContextImageDialog';
 import { suggestComicPanelPrompts } from '@/ai/flows/suggest-comic-panel-prompt';
-import type { PromptWithContext } from '@/ai/flows/generate-comic-panel'; // Updated import
+import type { PromptWithContext } from '@/ai/flows/generate-comic-panel';
 import { generateComicPanel } from '@/ai/flows/generate-comic-panel';
 import type { ComicPanelData } from '@/types/story';
 import { useToast } from '@/hooks/use-toast';
@@ -29,18 +29,17 @@ interface GeneratePanelDialogProps {
   isOpen: boolean;
   onClose: () => void;
   parentPanel: ComicPanelData | null;
-  allPanels: ComicPanelData[]; // All panels for context selection
+  allPanels: ComicPanelData[];
   onPanelGenerated: (newPanelImageUrls: string[], promptsUsed: string[]) => void;
 }
 
 const MAX_PROMPTS = 4;
 
 interface PromptStateItem {
-  id: string; // for react key
+  id: string;
   text: string;
-  customContextImageUrl: string | null; // Data URI for AI if custom
-  customContextImagePreviewUrl: string | null; // Data URI for preview in dialog
-  // Info about source if selected from previous panel
+  customContextImageUrl: string | null;
+  customContextImagePreviewUrl: string | null;
   sourcePanelId?: string; 
   sourceImageIndex?: number;
 }
@@ -59,7 +58,6 @@ const GeneratePanelDialog: FC<GeneratePanelDialogProps> = ({ isOpen, onClose, pa
     return parentPanel?.imageUrls[0] || null;
   }, [parentPanel]);
 
-  // Initialize prompts when dialog opens or parentPanel changes
   useEffect(() => {
     if (isOpen && parentPanel) {
       setPrompts([{ 
@@ -104,8 +102,6 @@ const GeneratePanelDialog: FC<GeneratePanelDialogProps> = ({ isOpen, onClose, pa
       handlePromptTextChange(emptyIndex, suggestedPrompt);
     } else if (prompts.length < MAX_PROMPTS) {
         addPromptField();
-        // prompts.length will be the new last index *after* addPromptField updates state,
-        // so we need to use the current length for the new field.
         handlePromptTextChange(prompts.length, suggestedPrompt);
     } else { 
       handlePromptTextChange(0, suggestedPrompt);
@@ -118,10 +114,6 @@ const GeneratePanelDialog: FC<GeneratePanelDialogProps> = ({ isOpen, onClose, pa
         return;
     }
     
-    // Determine context image for suggestions:
-    // 1. Custom context of the first prompt field if set.
-    // 2. Default context (parent panel's first image) if the first prompt field has no custom context.
-    // 3. Null if neither is available (should be rare if parentPanel is present for dialog to open)
     const suggestionContextImageUrl = 
         (prompts.length > 0 && prompts[0].customContextImageUrl) 
         ? prompts[0].customContextImageUrl
@@ -134,7 +126,6 @@ const GeneratePanelDialog: FC<GeneratePanelDialogProps> = ({ isOpen, onClose, pa
 
     setIsSuggesting(true);
     try {
-      // Text context can be from the first prompt if filled, or parent panel's info
       const firstPromptText = prompts.length > 0 && prompts[0].text.trim() !== '' ? prompts[0].text.trim() : null;
       const textContext = firstPromptText || parentPanel?.userDescription || parentPanel?.promptsUsed?.join('; ') || "A comic panel scene.";
 
@@ -190,15 +181,13 @@ const GeneratePanelDialog: FC<GeneratePanelDialogProps> = ({ isOpen, onClose, pa
 
     const promptsForApi: PromptWithContext[] = validPrompts.map(p => ({
       promptText: p.text.trim(),
-      contextImageUrl: p.customContextImageUrl || getDefaultContextImageUrl() || '', // Fallback if somehow default is null
+      contextImageUrl: p.customContextImageUrl || getDefaultContextImageUrl() || '', 
     }));
 
-    // Ensure all contextImageUrls are valid
     if (promptsForApi.some(p => !p.contextImageUrl)) {
         toast({ title: "Context Missing", description: "One or more prompts are missing a context image. Please ensure default or custom context is set.", variant: "destructive"});
         return;
     }
-
 
     setIsGenerating(true);
     try {
@@ -226,33 +215,32 @@ const GeneratePanelDialog: FC<GeneratePanelDialogProps> = ({ isOpen, onClose, pa
   const defaultCtxImg = getDefaultContextImageUrl();
 
   const suggestionButtonText = prompts.length > 0 && prompts[0].customContextImageUrl 
-    ? "Suggest Prompts (uses Image 1 custom context)"
-    : "Suggest Prompts (uses default context)";
-
+    ? "Suggest (uses Image 1 custom context)"
+    : "Suggest (uses default context)";
 
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-        <DialogContent className="sm:max-w-xl md:max-w-3xl lg:max-w-4xl bg-card">
+        <DialogContent className="w-full max-w-sm sm:max-w-xl md:max-w-3xl lg:max-w-4xl bg-card">
           <DialogHeader>
-            <DialogTitle className="text-2xl text-primary">Generate New Panel Images</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-xl sm:text-2xl text-primary">Generate New Panel Images</DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
               Describe up to {MAX_PROMPTS} images for the next panel. Each prompt generates one image. 
               You can set a custom context image for each prompt, or it will default to the first image of the parent panel.
             </DialogDescription>
           </DialogHeader>
           
-          <ScrollArea className="max-h-[calc(70vh-180px)] pr-3">
-            <div className="grid gap-4 py-2">
+          <ScrollArea className="max-h-[50vh] sm:max-h-[calc(70vh-180px)] pr-2 sm:pr-3">
+            <div className="grid gap-3 sm:gap-4 py-2">
               {prompts.map((promptItem, index) => (
-                <div key={promptItem.id} className="p-3 border border-border rounded-md bg-background/50 space-y-2">
+                <div key={promptItem.id} className="p-2 sm:p-3 border border-border rounded-md bg-background/50 space-y-1.5 sm:space-y-2">
                   <div className="flex justify-between items-center">
-                    <Label htmlFor={`prompt-text-${index}`} className="text-foreground font-semibold">
+                    <Label htmlFor={`prompt-text-${index}`} className="text-sm sm:text-base text-foreground font-semibold">
                       Image {index + 1} Prompt
                     </Label>
                     {prompts.length > 1 && (
-                      <Button variant="ghost" size="icon" onClick={() => removePromptField(index)} className="h-6 w-6 text-muted-foreground hover:text-destructive">
-                        <XCircle className="h-4 w-4" />
+                      <Button variant="ghost" size="icon" onClick={() => removePromptField(index)} className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground hover:text-destructive">
+                        <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       </Button>
                     )}
                   </div>
@@ -262,52 +250,52 @@ const GeneratePanelDialog: FC<GeneratePanelDialogProps> = ({ isOpen, onClose, pa
                     value={promptItem.text}
                     onChange={(e) => handlePromptTextChange(index, e.target.value)}
                     rows={2}
-                    className="text-foreground"
+                    className="text-foreground text-sm"
                   />
                   <div className="text-xs text-muted-foreground">Context for Image {index+1}:</div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-col xs:flex-row items-start xs:items-center gap-2">
                     {promptItem.customContextImagePreviewUrl ? (
-                       <Image src={promptItem.customContextImagePreviewUrl} alt={`Custom context for prompt ${index + 1}`} width={64} height={48} className="rounded object-contain border" data-ai-hint="context preview small"/>
+                       <Image src={promptItem.customContextImagePreviewUrl} alt={`Custom context for prompt ${index + 1}`} width={64} height={48} className="rounded object-contain border shrink-0" data-ai-hint="context preview small"/>
                     ) : defaultCtxImg ? (
-                       <Image src={defaultCtxImg} alt="Default parent panel context" width={64} height={48} className="rounded object-contain border" data-ai-hint="parent context small"/>
+                       <Image src={defaultCtxImg} alt="Default parent panel context" width={64} height={48} className="rounded object-contain border shrink-0" data-ai-hint="parent context small"/>
                     ) : (
-                      <div className="w-16 h-12 flex items-center justify-center bg-muted rounded border text-muted-foreground text-xs">No Ctx</div>
+                      <div className="w-16 h-12 flex items-center justify-center bg-muted rounded border text-muted-foreground text-xs shrink-0">No Ctx</div>
                     )}
-                    <div className="flex flex-col gap-1">
-                        <Button onClick={() => handleOpenSetContextImageDialog(index)} variant="outline" size="sm" className="text-xs">
+                    <div className="flex flex-col gap-1 w-full xs:w-auto">
+                        <Button onClick={() => handleOpenSetContextImageDialog(index)} variant="outline" size="sm" className="text-[10px] sm:text-xs h-7 sm:h-8 px-2">
                             <ImageIcon className="mr-1 h-3 w-3" /> Set Custom Context
                         </Button>
                         {promptItem.customContextImageUrl && (
-                            <Button onClick={() => handleClearCustomContext(index)} variant="ghost" size="sm" className="text-xs text-destructive hover:text-destructive/80">
+                            <Button onClick={() => handleClearCustomContext(index)} variant="ghost" size="sm" className="text-[10px] sm:text-xs text-destructive hover:text-destructive/80 h-7 sm:h-8 px-2">
                                 <RotateCcw className="mr-1 h-3 w-3" /> Use Default Context
                             </Button>
                         )}
                     </div>
                      {promptItem.customContextImageUrl && promptItem.sourcePanelId && (
-                        <p className="text-xs text-muted-foreground ml-2">
-                            Using image { (promptItem.sourceImageIndex ?? 0) + 1} from panel <span className="font-medium truncate max-w-[60px] inline-block align-bottom" title={allPanels.find(p=>p.id === promptItem.sourcePanelId)?.title}>{allPanels.find(p=>p.id === promptItem.sourcePanelId)?.title?.substring(0,10) || promptItem.sourcePanelId.substring(0,4)}...</span>
+                        <p className="text-[10px] sm:text-xs text-muted-foreground ml-0 xs:ml-2">
+                            Using img { (promptItem.sourceImageIndex ?? 0) + 1} from <span className="font-medium truncate max-w-[60px] inline-block align-bottom" title={allPanels.find(p=>p.id === promptItem.sourcePanelId)?.title}>{allPanels.find(p=>p.id === promptItem.sourcePanelId)?.title?.substring(0,10) || promptItem.sourcePanelId.substring(0,4)}...</span>
                         </p>
                     )}
                      {promptItem.customContextImageUrl && !promptItem.sourcePanelId && (
-                        <p className="text-xs text-muted-foreground ml-2">Using uploaded image.</p>
+                        <p className="text-[10px] sm:text-xs text-muted-foreground ml-0 xs:ml-2">Using uploaded image.</p>
                     )}
                     {!promptItem.customContextImageUrl && (
-                         <p className="text-xs text-muted-foreground ml-2">Using default context (Parent Panel Image 1).</p>
+                         <p className="text-[10px] sm:text-xs text-muted-foreground ml-0 xs:ml-2">Using default context (Parent Img 1).</p>
                     )}
                   </div>
                 </div>
               ))}
               {prompts.length < MAX_PROMPTS && (
-                <Button onClick={addPromptField} variant="outline" size="sm" className="mt-1 justify-start">
+                <Button onClick={addPromptField} variant="outline" size="sm" className="mt-1 justify-start text-xs sm:text-sm h-8 sm:h-9">
                   <PlusCircle className="mr-2 h-4 w-4" />
-                  Add Prompt for another Image (up to {MAX_PROMPTS})
+                  Add Prompt (up to {MAX_PROMPTS})
                 </Button>
               )}
             </div>
           </ScrollArea>
 
-          <div className="mt-4 flex flex-col gap-2">
-              <Button onClick={handleSuggestPrompts} disabled={isSuggesting || (!parentPanel && prompts.length === 0)} variant="outline" size="sm">
+          <div className="mt-3 sm:mt-4 flex flex-col gap-2">
+              <Button onClick={handleSuggestPrompts} disabled={isSuggesting || (!parentPanel && prompts.length === 0)} variant="outline" size="sm" className="text-xs sm:text-sm h-8 sm:h-9">
                   {isSuggesting ? ( <Loader2 className="mr-2 h-4 w-4 animate-spin" /> ) : ( <Wand2 className="mr-2 h-4 w-4" /> )}
                   {suggestionButtonText}
               </Button>
@@ -320,14 +308,15 @@ const GeneratePanelDialog: FC<GeneratePanelDialogProps> = ({ isOpen, onClose, pa
               )}
           </div>
 
-          <DialogFooter className="mt-6">
+          <DialogFooter className="mt-4 sm:mt-6 flex flex-col sm:flex-row gap-2 sm:gap-0">
             <DialogClose asChild>
-              <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={handleClose} className="w-full sm:w-auto">Cancel</Button>
             </DialogClose>
             <Button 
               type="button" 
               onClick={handleGeneratePanel} 
               disabled={isGenerating || activePromptsCount === 0 || !parentPanel}
+              className="w-full sm:w-auto"
             >
               {isGenerating ? ( <Loader2 className="mr-2 h-4 w-4 animate-spin" /> ) : ( <Sparkles className="mr-2 h-4 w-4" /> )}
               Generate {activePromptsCount > 0 ? `${activePromptsCount} Image(s)` : 'Panel'}
@@ -353,4 +342,3 @@ const GeneratePanelDialog: FC<GeneratePanelDialogProps> = ({ isOpen, onClose, pa
 };
 
 export default GeneratePanelDialog;
-
