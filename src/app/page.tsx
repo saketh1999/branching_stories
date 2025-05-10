@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useCallback } from 'react';
@@ -30,44 +31,60 @@ export default function Home() {
 
   const handleNewStory = useCallback(() => {
     resetStory();
-    toast({ title: "New Story Started", description: "Your canvas is clear. Upload a panel to begin!"});
+    toast({ title: "New Story Started", description: "Your canvas is clear. Upload images to begin!"});
   }, [resetStory, toast]);
 
-  const processUploadedFile = (file: File, description: string) => {
+  // Updated to handle multiple files
+  const processUploadedFiles = (files: File[], description: string) => {
+    if (files.length === 0) {
+        toast({ title: "No Files", description: "Please select at least one image file.", variant: "destructive"});
+        return;
+    }
     setIsProcessingFile(true);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const imageUrl = reader.result as string;
-      addPanel({ imageUrl, parentId: null, userDescription: description });
-      setIsUploadDialogOpen(false);
-      setIsProcessingFile(false);
-      toast({ title: "Panel Uploaded!", description: "Your story has begun." });
-    };
-    reader.onerror = () => {
-      setIsProcessingFile(false);
-      toast({ title: "File Error", description: "Could not read the uploaded file.", variant: "destructive" });
-    };
-    reader.readAsDataURL(file);
+    const fileReadPromises = files.map(file => {
+      return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    });
+
+    Promise.all(fileReadPromises)
+      .then(imageUrls => {
+        addPanel({ imageUrls, parentId: null, userDescription: description });
+        setIsUploadDialogOpen(false);
+        toast({ title: "Panel Uploaded!", description: `${imageUrls.length} image(s) started your story.` });
+      })
+      .catch(error => {
+        console.error("Error reading files:", error);
+        toast({ title: "File Error", description: "Could not read one or more uploaded files.", variant: "destructive" });
+      })
+      .finally(() => {
+        setIsProcessingFile(false);
+      });
   };
 
   const handleOpenGenerateDialog = useCallback((panelId: string) => {
-    const panel = getPanel(panelId); // getPanel is still useful here for fetching data for the dialog
+    const panel = getPanel(panelId);
     if (panel) {
       setSelectedPanelForGeneration(panel);
       setIsGenerateDialogOpen(true);
     }
   }, [getPanel]);
 
-  const handlePanelGenerated = useCallback((newPanelDataUri: string, promptUsed: string) => {
+  // Updated to handle multiple generated images and their prompts
+  const handlePanelGenerated = useCallback((newPanelImageUrls: string[], promptsUsed: string[]) => {
     if (selectedPanelForGeneration) {
       addPanel({ 
-        imageUrl: newPanelDataUri, 
+        imageUrls: newPanelImageUrls, 
         parentId: selectedPanelForGeneration.id,
-        promptUsed
+        promptsUsed
       });
     }
     setIsGenerateDialogOpen(false);
     setSelectedPanelForGeneration(null);
+     // Toast is now handled within GeneratePanelDialog upon success/failure
   }, [addPanel, selectedPanelForGeneration]);
 
   return (
@@ -77,25 +94,24 @@ export default function Home() {
         onNewStory={handleNewStory}
         hasStory={!!rootPanelId}
       />
-      <main className="flex-1 overflow-hidden relative"> {/* Changed p- to overflow-hidden for ReactFlow */}
+      <main className="flex-1 overflow-hidden relative">
         {isProcessingFile && (
           <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center z-50">
             <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-            <p className="text-lg text-foreground">Processing your panel...</p>
+            <p className="text-lg text-foreground">Processing your panel images...</p>
           </div>
         )}
         {!rootPanelId && !isProcessingFile && (
-          <div className="flex items-center justify-center h-full"> {/* Center WelcomeMessage */}
+          <div className="flex items-center justify-center h-full">
             <WelcomeMessage onUploadInitial={handleUploadInitialPanel} />
           </div>
         )}
-        {/* FlowchartDisplay will now take full height of main if rootPanelId exists */}
         {rootPanelId && !isProcessingFile && (
           <FlowchartDisplay
             panels={panels}
             rootId={rootPanelId}
             onGenerateNext={handleOpenGenerateDialog}
-            onBranch={handleOpenGenerateDialog} // Same action for now
+            onBranch={handleOpenGenerateDialog} 
           />
         )}
       </main>
@@ -103,7 +119,7 @@ export default function Home() {
       <UploadInitialPanelDialog
         isOpen={isUploadDialogOpen}
         onClose={() => setIsUploadDialogOpen(false)}
-        onUpload={processUploadedFile}
+        onUpload={processUploadedFiles} // Updated handler
       />
       
       {selectedPanelForGeneration && (
@@ -114,7 +130,7 @@ export default function Home() {
             setSelectedPanelForGeneration(null);
           }}
           parentPanel={selectedPanelForGeneration}
-          onPanelGenerated={handlePanelGenerated}
+          onPanelGenerated={handlePanelGenerated} // Updated handler
         />
       )}
     </div>

@@ -1,8 +1,16 @@
+
 "use client";
 
 import type { ComicPanelData } from '@/types/story';
 import { useState, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid'; // Using uuid for unique IDs
+
+interface AddPanelArgs {
+  imageUrls: string[]; // Array of 1-4 image URLs
+  parentId: string | null;
+  promptsUsed?: string[]; // For generated panels
+  userDescription?: string; // For initial panel
+}
 
 export function useStoryState() {
   const [panels, setPanels] = useState<ComicPanelData[]>([]);
@@ -25,19 +33,27 @@ export function useStoryState() {
   );
   
   const addPanel = useCallback(
-    ({ imageUrl, parentId, promptUsed, userDescription }: {
-      imageUrl: string;
-      parentId: string | null;
-      promptUsed?: string;
-      userDescription?: string;
-    }): string => {
+    ({ imageUrls, parentId, promptsUsed, userDescription }: AddPanelArgs): string => {
+      if (imageUrls.length === 0 || imageUrls.length > 4) {
+        console.error("A panel must have between 1 and 4 images.");
+        // Or throw an error, depending on how strict you want to be.
+        // For now, let's prevent adding if outside bounds, though UI should validate this.
+        if (imageUrls.length === 0) throw new Error("Cannot add a panel with no images.");
+        if (imageUrls.length > 4) throw new Error("Cannot add a panel with more than 4 images.");
+
+      }
+      if (promptsUsed && promptsUsed.length !== imageUrls.length) {
+        console.error("Number of prompts must match number of images for generated panels.");
+        throw new Error("Prompts and images count mismatch for generated panel.");
+      }
+
       const newPanelId = uuidv4();
       const newPanel: ComicPanelData = {
         id: newPanelId,
-        imageUrl,
+        imageUrls,
         parentId,
-        promptUsed,
-        userDescription,
+        promptsUsed: promptsUsed,
+        userDescription: userDescription,
         childrenIds: [],
       };
 
@@ -57,7 +73,7 @@ export function useStoryState() {
       
       return newPanelId;
     },
-    [rootPanelId] // Add rootPanelId to dependencies
+    [rootPanelId] 
   );
 
   const resetStory = useCallback(() => {

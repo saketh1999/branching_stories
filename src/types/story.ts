@@ -1,11 +1,9 @@
+
 export interface ComicPanelData {
   id: string;
-  imageUrl: string; // Data URI of the panel image
-  promptUsed?: string; // The prompt that generated this panel, if any
-  userDescription?: string; // User-provided description for uploaded panels
+  imageUrls: string[]; // Array of 1 to 4 image data URIs
+  promptsUsed?: string[]; // For generated panels, array of prompts (1 per image). Length matches imageUrls.
+  userDescription?: string; // For initial uploaded panel, single description for all its images.
   parentId: string | null;
   childrenIds: string[];
-  // Optional: for explicit positioning in a complex flowchart in the future
-  // x?: number; 
-  // y?: number;
 }

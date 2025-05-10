@@ -1,3 +1,4 @@
+
 import type { FC } from 'react';
 import { Button } from '@/components/ui/button';
 import { BookImage, PlusSquare, Trash2 } from 'lucide-react';
@@ -19,7 +20,7 @@ const AppHeader: FC<AppHeaderProps> = ({ onUploadInitialPanel, onNewStory, hasSt
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={onUploadInitialPanel} disabled={hasStory}>
             <PlusSquare className="mr-2 h-4 w-4" />
-            Upload First Panel
+            Upload First Panel Images
           </Button>
           <Button variant="destructive" onClick={onNewStory} disabled={!hasStory}>
             <Trash2 className="mr-2 h-4 w-4" />

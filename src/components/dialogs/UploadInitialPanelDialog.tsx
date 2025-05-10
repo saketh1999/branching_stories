@@ -1,3 +1,4 @@
+
 import type { FC, ChangeEvent } from 'react';
 import { useState } from 'react';
 import {
@@ -13,56 +14,82 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { UploadCloud } from 'lucide-react';
+import { UploadCloud, Image as ImageIcon } from 'lucide-react'; // ImageIcon for previews
 import Image from 'next/image';
 
 interface UploadInitialPanelDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onUpload: (file: File, description: string) => void;
+  onUpload: (files: File[], description: string) => void; // Changed to File[]
 }
 
+const MAX_FILES = 4;
+
 const UploadInitialPanelDialog: FC<UploadInitialPanelDialogProps> = ({ isOpen, onClose, onUpload }) => {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [description, setDescription] = useState<string>('');
   const [error, setError] = useState<string>('');
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     setError('');
-    const file = event.target.files?.[0];
-    if (file) {
-      if (!file.type.startsWith('image/')) {
-        setError('Please select an image file (PNG, JPG, GIF, etc.).');
-        setSelectedFile(null);
-        setPreviewUrl(null);
-        return;
-      }
-      setSelectedFile(file);
+    const files = event.target.files ? Array.from(event.target.files) : [];
+    
+    if (files.length === 0) {
+      setSelectedFiles([]);
+      setPreviewUrls([]);
+      return;
+    }
+
+    if (files.length > MAX_FILES) {
+      setError(`You can upload a maximum of ${MAX_FILES} images.`);
+      setSelectedFiles([]);
+      setPreviewUrls([]);
+      event.target.value = ''; // Clear the input
+      return;
+    }
+
+    const imageFiles = files.filter(file => file.type.startsWith('image/'));
+    if (imageFiles.length !== files.length) {
+      setError('Please select only image files (PNG, JPG, GIF, etc.).');
+      setSelectedFiles([]);
+      setPreviewUrls([]);
+      event.target.value = ''; // Clear the input
+      return;
+    }
+
+    setSelectedFiles(imageFiles);
+    
+    const newPreviewUrls: string[] = [];
+    imageFiles.forEach(file => {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setPreviewUrl(reader.result as string);
+        newPreviewUrls.push(reader.result as string);
+        // Update previews once all files are read
+        if (newPreviewUrls.length === imageFiles.length) {
+          setPreviewUrls(newPreviewUrls);
+        }
       };
       reader.readAsDataURL(file);
-    }
+    });
   };
 
   const handleSubmit = () => {
-    if (!selectedFile) {
-      setError('Please select a file to upload.');
+    if (selectedFiles.length === 0) {
+      setError('Please select at least one file to upload.');
       return;
     }
     if (!description.trim()) {
-        setError('Please provide a brief description for your panel.');
+        setError('Please provide a brief description for your panel images.');
         return;
     }
-    onUpload(selectedFile, description);
+    onUpload(selectedFiles, description);
     handleClose();
   };
 
   const handleClose = () => {
-    setSelectedFile(null);
-    setPreviewUrl(null);
+    setSelectedFiles([]);
+    setPreviewUrls([]);
     setDescription('');
     setError('');
     onClose();
@@ -70,28 +97,44 @@ const UploadInitialPanelDialog: FC<UploadInitialPanelDialogProps> = ({ isOpen, o
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="sm:max-w-[480px] bg-card">
+      <DialogContent className="sm:max-w-lg bg-card">
         <DialogHeader>
           <DialogTitle className="text-2xl text-primary">Upload Your First Comic Panel</DialogTitle>
           <DialogDescription>
-            Choose an image file for the starting panel of your story and add a short description.
+            Choose 1 to {MAX_FILES} image files for the starting panel and add a short description for them.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
-          <div className="grid w-full max-w-sm items-center gap-1.5">
-            <Label htmlFor="picture" className="text-foreground">Comic Panel Image</Label>
-            <Input id="picture" type="file" accept="image/*" onChange={handleFileChange} className="text-foreground file:text-primary" />
+          <div className="grid w-full items-center gap-1.5">
+            <Label htmlFor="picture" className="text-foreground">Comic Panel Images (1-{MAX_FILES})</Label>
+            <Input 
+              id="picture" 
+              type="file" 
+              accept="image/*" 
+              multiple // Allow multiple file selection
+              onChange={handleFileChange} 
+              className="text-foreground file:text-primary" 
+            />
             {error && <p className="text-sm text-destructive">{error}</p>}
           </div>
-          {previewUrl && (
-            <div className="mt-2 border border-border rounded-md p-2 flex justify-center">
-              <Image src={previewUrl} alt="Preview" width={200} height={150} className="object-contain rounded" data-ai-hint="comic preview"/>
+
+          {previewUrls.length > 0 && (
+            <div className="mt-2 border border-border rounded-md p-2">
+              <Label className="text-sm text-muted-foreground mb-1 block">Previews ({previewUrls.length} selected):</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {previewUrls.map((url, index) => (
+                  <div key={index} className="aspect-square relative bg-muted rounded overflow-hidden">
+                    <Image src={url} alt={`Preview ${index + 1}`} layout="fill" objectFit="contain" data-ai-hint="comic preview small"/>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
+
           <div className="grid w-full gap-1.5">
-            <Label htmlFor="description" className="text-foreground">Panel Description</Label>
+            <Label htmlFor="description" className="text-foreground">Panel Images Description</Label>
             <Textarea
-              placeholder="E.g., A brave knight faces a dragon..."
+              placeholder="E.g., A brave knight encounters a mysterious forest..."
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -101,10 +144,10 @@ const UploadInitialPanelDialog: FC<UploadInitialPanelDialogProps> = ({ isOpen, o
         </div>
         <DialogFooter>
           <DialogClose asChild>
-            <Button type="button" variant="outline">Cancel</Button>
+            <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
           </DialogClose>
-          <Button type="submit" onClick={handleSubmit} disabled={!selectedFile || !description.trim()}>
-            <UploadCloud className="mr-2 h-4 w-4" /> Upload Panel
+          <Button type="submit" onClick={handleSubmit} disabled={selectedFiles.length === 0 || !description.trim()}>
+            <UploadCloud className="mr-2 h-4 w-4" /> Upload Panel Images
           </Button>
         </DialogFooter>
       </DialogContent>
