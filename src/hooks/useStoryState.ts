@@ -4,22 +4,10 @@
 import type { ComicPanelData, ComicStoryInfo } from '@/types/story';
 import { useState, useCallback, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import {
-  getStoryInfo,
-  createOrUpdateStoryInfo,
-  getPanelsForStory,
-  addPanelToDb,
-  addComicBookToDb,
-  updatePanelInDb,
-  updatePanelChildrenInDb,
-  resetStoryInDb
-} from '@/services/firestoreService';
-import { Timestamp } from 'firebase/firestore';
 import { useToast } from './use-toast';
 
-
-// TODO: For multi-user support, storyId would likely come from user auth or URL.
-const DEFAULT_STORY_ID = "defaultStory"; 
+const LOCAL_STORAGE_STORY_INFO_KEY = "comicStoryInfo_v2";
+const LOCAL_STORAGE_PANELS_KEY = "comicStoryPanels_v2";
 const DEFAULT_STORY_TITLE = "My Branching Tale";
 
 interface AddPanelArgs {
@@ -36,40 +24,87 @@ interface AddComicBookArgs {
 
 export function useStoryState() {
   const [panels, setPanels] = useState<ComicPanelData[]>([]);
-  const [rootPanelId, setRootPanelId] = useState<string | null>(null);
-  const [lastInitialPanelId, setLastInitialPanelId] = useState<string | null>(null);
+  const [storyInfo, setStoryInfo] = useState<ComicStoryInfo | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const loadStory = useCallback(async () => {
+  const rootPanelId = storyInfo?.rootPanelId || null;
+  const lastInitialPanelId = storyInfo?.lastInitialPanelId || null;
+
+  const saveStateToLocalStorage = useCallback((currentStoryInfo: ComicStoryInfo | null, currentPanels: ComicPanelData[]) => {
+    try {
+      if (currentStoryInfo) {
+        localStorage.setItem(LOCAL_STORAGE_STORY_INFO_KEY, JSON.stringify(currentStoryInfo));
+      } else {
+        localStorage.removeItem(LOCAL_STORAGE_STORY_INFO_KEY);
+      }
+      localStorage.setItem(LOCAL_STORAGE_PANELS_KEY, JSON.stringify(currentPanels));
+    } catch (e) {
+      console.error("Error saving state to localStorage:", e);
+      toast({ title: "Local Storage Error", description: "Could not save story progress locally.", variant: "destructive" });
+    }
+  }, [toast]);
+
+  const loadStory = useCallback(() => {
     setIsLoading(true);
     setError(null);
     try {
-      let storyInfo = await getStoryInfo(DEFAULT_STORY_ID);
-      if (!storyInfo) {
-        await createOrUpdateStoryInfo(DEFAULT_STORY_ID, { 
-            title: DEFAULT_STORY_TITLE, 
-            rootPanelId: null, 
-            lastInitialPanelId: null 
-        });
-        storyInfo = await getStoryInfo(DEFAULT_STORY_ID); // Re-fetch after creation
-         if (!storyInfo) throw new Error("Failed to create or load story info.");
+      const storedStoryInfoJSON = localStorage.getItem(LOCAL_STORAGE_STORY_INFO_KEY);
+      const storedPanelsJSON = localStorage.getItem(LOCAL_STORAGE_PANELS_KEY);
+
+      let loadedStoryInfo: ComicStoryInfo | null = null;
+      if (storedStoryInfoJSON) {
+        const parsedInfo = JSON.parse(storedStoryInfoJSON);
+        loadedStoryInfo = {
+          ...parsedInfo,
+          createdAt: new Date(parsedInfo.createdAt),
+          updatedAt: new Date(parsedInfo.updatedAt),
+        };
+      } else {
+        loadedStoryInfo = {
+          id: uuidv4(), // Default story ID if none exists
+          title: DEFAULT_STORY_TITLE,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          rootPanelId: null,
+          lastInitialPanelId: null,
+        };
       }
-      
-      const dbPanels = await getPanelsForStory(DEFAULT_STORY_ID);
-      setPanels(dbPanels.map(p => ({...p, createdAt: p.createdAt || new Date() }))); // Ensure createdAt is a Date
-      setRootPanelId(storyInfo.rootPanelId);
-      setLastInitialPanelId(storyInfo.lastInitialPanelId);
+      setStoryInfo(loadedStoryInfo);
+
+      if (storedPanelsJSON) {
+        const parsedPanels: ComicPanelData[] = JSON.parse(storedPanelsJSON);
+        setPanels(parsedPanels.map(p => ({ ...p, createdAt: p.createdAt ? new Date(p.createdAt) : new Date() })));
+      } else {
+        setPanels([]);
+      }
+
+      if (!storedStoryInfoJSON || !storedPanelsJSON) {
+        // If either is missing, effectively a new story, so save initial state
+        saveStateToLocalStorage(loadedStoryInfo, []);
+      }
 
     } catch (err) {
-      console.error("Failed to load story:", err);
+      console.error("Failed to load story from localStorage:", err);
       setError(err instanceof Error ? err.message : "An unknown error occurred while loading the story.");
-      toast({ title: "Load Error", description: "Could not load story data.", variant: "destructive" });
+      toast({ title: "Load Error", description: "Could not load story data from local storage. Starting fresh.", variant: "destructive" });
+      // Fallback to a fresh story
+      const freshStoryInfo: ComicStoryInfo = {
+        id: uuidv4(),
+        title: DEFAULT_STORY_TITLE,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        rootPanelId: null,
+        lastInitialPanelId: null,
+      };
+      setStoryInfo(freshStoryInfo);
+      setPanels([]);
+      saveStateToLocalStorage(freshStoryInfo, []);
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, [toast, saveStateToLocalStorage]);
 
   useEffect(() => {
     loadStory();
@@ -99,21 +134,25 @@ export function useStoryState() {
       const newPanelId = uuidv4();
       let actualParentId: string | null = intendedParentId;
       let panelTitle = `Panel ${newPanelId.substring(0, 4)}`;
-      let newRootPanelId = rootPanelId;
-      let newLastInitialPanelId = lastInitialPanelId;
+      
+      let newRootPanelId = storyInfo?.rootPanelId || null;
+      let newLastInitialPanelId = storyInfo?.lastInitialPanelId || null;
+      const currentStoryId = storyInfo?.id || uuidv4();
+
 
       if (userDescription) {
         panelTitle = userDescription.substring(0, 50) + (userDescription.length > 50 ? '...' : '');
-        if (!rootPanelId) {
+        if (!newRootPanelId) { // This is the very first panel group uploaded
           actualParentId = null;
           newRootPanelId = newPanelId;
-        } else {
-          actualParentId = lastInitialPanelId; 
+        } else { // Subsequent initial panels link to the last "initial" one
+          actualParentId = newLastInitialPanelId; 
         }
-        newLastInitialPanelId = newPanelId;
+        newLastInitialPanelId = newPanelId; // This new panel is now the last "initial" one
       } else if (promptsUsed && promptsUsed.length > 0) {
         panelTitle = promptsUsed[0].substring(0, 50) + (promptsUsed[0].length > 50 ? '...' : '');
       }
+
 
       const newPanel: ComicPanelData = {
         id: newPanelId,
@@ -125,44 +164,34 @@ export function useStoryState() {
         childrenIds: [],
         isGroupNode: false,
         isComicBookPage: false,
-        createdAt: new Date(), // Use client date, Firestore will use serverTimestamp on first save
+        createdAt: new Date(),
       };
 
-      try {
-        // Optimistic UI update
-        setPanels(prevPanels => {
-          const updatedPanels = [...prevPanels, newPanel];
-          if (actualParentId) {
-            return updatedPanels.map(p =>
-              p.id === actualParentId ? { ...p, childrenIds: [...p.childrenIds, newPanelId] } : p
-            );
-          }
-          return updatedPanels;
-        });
-        if (newRootPanelId !== rootPanelId) setRootPanelId(newRootPanelId);
-        if (newLastInitialPanelId !== lastInitialPanelId) setLastInitialPanelId(newLastInitialPanelId);
-        
-        // DB update
-        await addPanelToDb(DEFAULT_STORY_ID, newPanel);
-        if (actualParentId) {
-          const parentPanel = getPanel(actualParentId);
-          if (parentPanel) {
-            await updatePanelChildrenInDb(DEFAULT_STORY_ID, actualParentId, [...parentPanel.childrenIds, newPanelId]);
-          }
+      const updatedPanels = [...panels, newPanel];
+      if (actualParentId) {
+        const parentIndex = updatedPanels.findIndex(p => p.id === actualParentId);
+        if (parentIndex > -1) {
+          updatedPanels[parentIndex] = {
+            ...updatedPanels[parentIndex],
+            childrenIds: [...updatedPanels[parentIndex].childrenIds, newPanelId],
+          };
         }
-        await createOrUpdateStoryInfo(DEFAULT_STORY_ID, { rootPanelId: newRootPanelId, lastInitialPanelId: newLastInitialPanelId });
-        
-        toast({ title: "Panel Added", description: `Panel "${panelTitle}" created.` });
-      } catch (err) {
-        console.error("Failed to add panel:", err);
-        toast({ title: "Save Error", description: "Could not save new panel.", variant: "destructive" });
-        // Revert optimistic update (simplified - full revert might need storing pre-update state)
-        loadStory(); // Reload to ensure consistency
-        throw err; 
       }
+      setPanels(updatedPanels);
+
+      const updatedStoryInfo: ComicStoryInfo = {
+        ...(storyInfo || { id: currentStoryId, title: DEFAULT_STORY_TITLE, createdAt: new Date() }),
+        rootPanelId: newRootPanelId,
+        lastInitialPanelId: newLastInitialPanelId,
+        updatedAt: new Date(),
+      };
+      setStoryInfo(updatedStoryInfo);
+      
+      saveStateToLocalStorage(updatedStoryInfo, updatedPanels);
+      toast({ title: "Panel Added", description: `Panel "${panelTitle}" created.` });
       return newPanelId;
     },
-    [rootPanelId, lastInitialPanelId, getPanel, toast, loadStory, panels]
+    [storyInfo, panels, toast, saveStateToLocalStorage]
   );
 
   const addComicBook = useCallback(
@@ -174,14 +203,19 @@ export function useStoryState() {
 
       const comicBookGroupId = uuidv4();
       const actualComicBookTitle = comicBookTitle.trim() || `Comic Book ${comicBookGroupId.substring(0,4)}`;
+      
       let comicBookParentId: string | null = null;
-      let newRootPanelId = rootPanelId;
+      let newRootPanelId = storyInfo?.rootPanelId || null;
+      let newLastInitialPanelId = storyInfo?.lastInitialPanelId || null;
+      const currentStoryId = storyInfo?.id || uuidv4();
 
-      if (!rootPanelId) {
+      if (!newRootPanelId) { // This is the very first comic book uploaded
         newRootPanelId = comicBookGroupId;
-      } else {
-        comicBookParentId = lastInitialPanelId;
+      } else { // Subsequent comic books link to the last "initial" panel/comic book
+        comicBookParentId = newLastInitialPanelId;
       }
+      newLastInitialPanelId = comicBookGroupId; // This new comic book is now the last "initial" one
+
 
       const comicBookGroupNode: ComicPanelData = {
         id: comicBookGroupId,
@@ -211,46 +245,38 @@ export function useStoryState() {
         };
       });
       
-      try {
-        // Optimistic UI Update
-        setPanels(prev => {
-            let updatedPanels = [...prev, comicBookGroupNode, ...pagePanelsToAdd];
-            if (comicBookParentId) {
-                updatedPanels = updatedPanels.map(p =>
-                    p.id === comicBookParentId ? { ...p, childrenIds: [...p.childrenIds, comicBookGroupId] } : p
-                );
-            }
-            return updatedPanels;
-        });
-        if(newRootPanelId !== rootPanelId) setRootPanelId(newRootPanelId);
-        setLastInitialPanelId(comicBookGroupId);
-
-        // DB Update
-        await addComicBookToDb(DEFAULT_STORY_ID, comicBookGroupNode, pagePanelsToAdd);
-        if (comicBookParentId) {
-          const parentPanel = getPanel(comicBookParentId); // getPanel uses current state, which should be updated
-          if (parentPanel) {
-             await updatePanelChildrenInDb(DEFAULT_STORY_ID, comicBookParentId, [...parentPanel.childrenIds, comicBookGroupId]);
-          }
+      let updatedPanels = [...panels, comicBookGroupNode, ...pagePanelsToAdd];
+      if (comicBookParentId) {
+        const parentIndex = updatedPanels.findIndex(p => p.id === comicBookParentId);
+        if (parentIndex > -1) {
+          updatedPanels[parentIndex] = {
+            ...updatedPanels[parentIndex],
+            childrenIds: [...updatedPanels[parentIndex].childrenIds, comicBookGroupId],
+          };
         }
-        await createOrUpdateStoryInfo(DEFAULT_STORY_ID, { rootPanelId: newRootPanelId, lastInitialPanelId: comicBookGroupId });
-
-        toast({ title: "Comic Book Added", description: `"${actualComicBookTitle}" created.` });
-      } catch (err) {
-        console.error("Failed to add comic book:", err);
-        toast({ title: "Save Error", description: "Could not save new comic book.", variant: "destructive" });
-        loadStory(); // Revert
-        throw err;
       }
+      setPanels(updatedPanels);
+      
+      const updatedStoryInfo: ComicStoryInfo = {
+        ...(storyInfo || { id: currentStoryId, title: DEFAULT_STORY_TITLE, createdAt: new Date() }),
+        rootPanelId: newRootPanelId,
+        lastInitialPanelId: newLastInitialPanelId,
+        updatedAt: new Date(),
+      };
+      setStoryInfo(updatedStoryInfo);
+
+      saveStateToLocalStorage(updatedStoryInfo, updatedPanels);
+      toast({ title: "Comic Book Added", description: `"${actualComicBookTitle}" created.` });
       return comicBookGroupId;
     },
-    [rootPanelId, lastInitialPanelId, getPanel, toast, loadStory, panels]
+    [storyInfo, panels, toast, saveStateToLocalStorage]
   );
 
   const updatePanelTitle = useCallback(async (panelId: string, newTitle: string) => {
-    const panel = getPanel(panelId);
-    if (!panel) return;
+    const panelIndex = panels.findIndex(p => p.id === panelId);
+    if (panelIndex === -1) return;
 
+    const panel = panels[panelIndex];
     let finalTitle = newTitle.trim();
     if (!finalTitle) {
       if (panel.isGroupNode) finalTitle = panel.userDescription || `Comic Book ${panel.id.substring(0,4)}`;
@@ -259,34 +285,23 @@ export function useStoryState() {
     }
     const updatedUserDescription = panel.isGroupNode ? (panel.userDescription?.startsWith("Comic Book:") ? `Comic Book: ${finalTitle}`: finalTitle) : panel.userDescription;
 
-    const oldTitle = panel.title;
-    const oldUserDesc = panel.userDescription;
 
-    // Optimistic update
-    setPanels(prevPanels =>
-      prevPanels.map(p => p.id === panelId ? { ...p, title: finalTitle, userDescription: updatedUserDescription } : p)
-    );
+    const updatedPanels = [...panels];
+    updatedPanels[panelIndex] = { ...updatedPanels[panelIndex], title: finalTitle, userDescription: updatedUserDescription };
+    setPanels(updatedPanels);
 
-    try {
-      await updatePanelInDb(DEFAULT_STORY_ID, panelId, { title: finalTitle, userDescription: updatedUserDescription });
-      toast({ title: "Title Updated", description: `Panel title changed to "${finalTitle.substring(0,30)}...".`});
-    } catch (err) {
-      console.error("Failed to update panel title:", err);
-      toast({ title: "Save Error", description: "Could not update panel title.", variant: "destructive" });
-      // Revert optimistic update
-      setPanels(prevPanels =>
-        prevPanels.map(p => p.id === panelId ? { ...p, title: oldTitle, userDescription: oldUserDesc } : p)
-      );
-    }
-  }, [getPanel, toast, panels]);
+    const updatedStoryInfo = storyInfo ? { ...storyInfo, updatedAt: new Date() } : null;
+    if (updatedStoryInfo) setStoryInfo(updatedStoryInfo);
+    
+    saveStateToLocalStorage(updatedStoryInfo, updatedPanels);
+    toast({ title: "Title Updated", description: `Panel title changed to "${finalTitle.substring(0,30)}...".`});
+  }, [panels, storyInfo, toast, saveStateToLocalStorage]);
 
   const updatePanelImage = useCallback(async (panelId: string, imageIndex: number, newImageUrl: string, newPromptText?: string) => {
-    const panel = getPanel(panelId);
-    if (!panel) return;
+    const panelIdx = panels.findIndex(p => p.id === panelId);
+    if (panelIdx === -1) return;
 
-    const oldImageUrls = [...panel.imageUrls];
-    const oldPromptsUsed = panel.promptsUsed ? [...panel.promptsUsed] : undefined;
-
+    const panel = panels[panelIdx];
     const updatedImageUrls = [...panel.imageUrls];
     if (imageIndex < 0 || imageIndex >= updatedImageUrls.length) {
       console.error(`Invalid imageIndex ${imageIndex} for panel ${panelId}`);
@@ -300,31 +315,22 @@ export function useStoryState() {
       if (imageIndex < updatedPromptsUsed.length) updatedPromptsUsed[imageIndex] = newPromptText;
     }
     
-    // Optimistic update
-    setPanels(prevPanels =>
-      prevPanels.map(p => p.id === panelId ? { ...p, imageUrls: updatedImageUrls, promptsUsed: updatedPromptsUsed } : p)
-    );
-    
-    try {
-      await updatePanelInDb(DEFAULT_STORY_ID, panelId, { imageUrls: updatedImageUrls, promptsUsed: updatedPromptsUsed });
-      toast({ title: "Image Updated", description: `Image ${imageIndex + 1} in panel updated.`});
-    } catch (err) {
-      console.error("Failed to update panel image:", err);
-      toast({ title: "Save Error", description: "Could not update panel image.", variant: "destructive" });
-      // Revert
-      setPanels(prevPanels =>
-        prevPanels.map(p => p.id === panelId ? { ...p, imageUrls: oldImageUrls, promptsUsed: oldPromptsUsed } : p)
-      );
-    }
-  }, [getPanel, toast, panels]);
+    const updatedPanels = [...panels];
+    updatedPanels[panelIdx] = { ...panel, imageUrls: updatedImageUrls, promptsUsed: updatedPromptsUsed };
+    setPanels(updatedPanels);
+
+    const updatedStoryInfo = storyInfo ? { ...storyInfo, updatedAt: new Date() } : null;
+    if (updatedStoryInfo) setStoryInfo(updatedStoryInfo);
+
+    saveStateToLocalStorage(updatedStoryInfo, updatedPanels);
+    toast({ title: "Image Updated", description: `Image ${imageIndex + 1} in panel updated.`});
+  }, [panels, storyInfo, toast, saveStateToLocalStorage]);
 
   const updatePanelImages = useCallback(async (panelId: string, updates: Array<{ imageIndex: number; newImageUrl: string; newPromptText: string }>) => {
-    const panel = getPanel(panelId);
-    if (!panel) return;
+    const panelIdx = panels.findIndex(p => p.id === panelId);
+    if (panelIdx === -1) return;
 
-    const oldImageUrls = [...panel.imageUrls];
-    const oldPromptsUsed = panel.promptsUsed ? [...panel.promptsUsed] : undefined;
-
+    const panel = panels[panelIdx];
     const updatedImageUrls = [...panel.imageUrls];
     let updatedPromptsUsed = panel.promptsUsed ? [...panel.promptsUsed] : Array(panel.imageUrls.length).fill('');
     while(updatedPromptsUsed.length < panel.imageUrls.length) updatedPromptsUsed.push('');
@@ -336,31 +342,31 @@ export function useStoryState() {
       }
     });
     
-    // Optimistic update
-    setPanels(prevPanels =>
-      prevPanels.map(p => p.id === panelId ? { ...p, imageUrls: updatedImageUrls, promptsUsed: updatedPromptsUsed } : p)
-    );
+    const updatedPanels = [...panels];
+    updatedPanels[panelIdx] = { ...panel, imageUrls: updatedImageUrls, promptsUsed: updatedPromptsUsed };
+    setPanels(updatedPanels);
 
-    try {
-      await updatePanelInDb(DEFAULT_STORY_ID, panelId, { imageUrls: updatedImageUrls, promptsUsed: updatedPromptsUsed });
-      toast({ title: "Panel Images Updated", description: "Multiple images in the panel were updated." });
-    } catch (err) {
-      console.error("Failed to update panel images:", err);
-      toast({ title: "Save Error", description: "Could not update panel images.", variant: "destructive" });
-      // Revert
-      setPanels(prevPanels =>
-        prevPanels.map(p => p.id === panelId ? { ...p, imageUrls: oldImageUrls, promptsUsed: oldPromptsUsed } : p)
-      );
-    }
-  }, [getPanel, toast, panels]);
+    const updatedStoryInfo = storyInfo ? { ...storyInfo, updatedAt: new Date() } : null;
+    if (updatedStoryInfo) setStoryInfo(updatedStoryInfo);
+    
+    saveStateToLocalStorage(updatedStoryInfo, updatedPanels);
+    toast({ title: "Panel Images Updated", description: "Multiple images in the panel were updated." });
+  }, [panels, storyInfo, toast, saveStateToLocalStorage]);
 
   const resetStory = useCallback(async () => {
     setIsLoading(true);
     try {
-      await resetStoryInDb(DEFAULT_STORY_ID);
+      const newStoryInfo: ComicStoryInfo = {
+        id: uuidv4(),
+        title: DEFAULT_STORY_TITLE,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        rootPanelId: null,
+        lastInitialPanelId: null,
+      };
       setPanels([]);
-      setRootPanelId(null);
-      setLastInitialPanelId(null);
+      setStoryInfo(newStoryInfo);
+      saveStateToLocalStorage(newStoryInfo, []);
       toast({ title: "Story Reset", description: "The story has been cleared." });
     } catch (err) {
       console.error("Failed to reset story:", err);
@@ -368,12 +374,13 @@ export function useStoryState() {
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, [toast, saveStateToLocalStorage]);
 
   return {
     panels,
-    rootPanelId,
-    lastInitialPanelId,
+    rootPanelId, // Derived from storyInfo
+    lastInitialPanelId, // Derived from storyInfo
+    storyInfo, // Expose full storyInfo if needed by UI (e.g. story title)
     isLoading,
     error,
     addPanel,

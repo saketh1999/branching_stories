@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import AppHeader from '@/components/layout/AppHeader';
 import WelcomeMessage from '@/components/WelcomeMessage';
 import FlowchartDisplay from '@/components/story/FlowchartDisplay';
@@ -21,8 +21,8 @@ export default function Home() {
   const { 
     panels, 
     rootPanelId, 
-    isLoading: isStoryLoading, 
-    error: storyError,
+    isLoading: isStoryLoading, // This now reflects local storage loading
+    error: storyError,       // Reflects local storage errors or other client-side issues
     addPanel, 
     addComicBook, 
     getPanel, 
@@ -37,7 +37,7 @@ export default function Home() {
   const [isUploadComicBookDialogOpen, setIsUploadComicBookDialogOpen] = useState(false);
   const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false);
   const [selectedPanelForGeneration, setSelectedPanelForGeneration] = useState<ComicPanelData | null>(null);
-  const [isProcessingFile, setIsProcessingFile] = useState(false); // For client-side file reading
+  const [isProcessingFile, setIsProcessingFile] = useState(false); 
 
   const [isRegenerateImageDialogOpen, setIsRegenerateImageDialogOpen] = useState(false);
   const [selectedImageForRegeneration, setSelectedImageForRegeneration] = useState<RegenerateImageDetails | null>(null);
@@ -55,9 +55,7 @@ export default function Home() {
   }, []);
 
   const handleNewStory = useCallback(async () => {
-    // useStoryState's resetStory now handles DB operations.
     await resetStory(); 
-    // Toast is handled within resetStory
   }, [resetStory]);
 
   const processUploadedFiles = (files: File[], description: string) => {
@@ -77,14 +75,11 @@ export default function Home() {
 
     Promise.all(fileReadPromises)
       .then(async imageUrls => {
-        // addPanel now handles DB operations
         await addPanel({ imageUrls, parentId: null, userDescription: description });
         setIsUploadDialogOpen(false);
-        // Toast is handled within addPanel
       })
       .catch(error => {
         console.error("Error reading files or adding panel:", error);
-        // Toast for file reading error
         toast({ title: "File Error", description: "Could not read files or create initial panel.", variant: "destructive" });
       })
       .finally(() => {
@@ -109,10 +104,8 @@ export default function Home() {
 
     Promise.all(fileReadPromises)
       .then(async pageImageUrls => {
-        // addComicBook now handles DB operations
         await addComicBook({ pageImageUrls, comicBookTitle: title });
         setIsUploadComicBookDialogOpen(false);
-        // Toast is handled within addComicBook
       })
       .catch(error => {
         console.error("Error reading comic book files or adding comic book:", error);
@@ -134,7 +127,6 @@ export default function Home() {
 
   const handlePanelGenerated = useCallback(async (newPanelImageUrls: string[], promptsUsed: string[]) => {
     if (selectedPanelForGeneration) {
-      // addPanel handles DB
       await addPanel({ 
         imageUrls: newPanelImageUrls, 
         parentId: selectedPanelForGeneration.id, 
@@ -143,13 +135,10 @@ export default function Home() {
     }
     setIsGenerateDialogOpen(false);
     setSelectedPanelForGeneration(null);
-    // Toast is handled in addPanel
   }, [addPanel, selectedPanelForGeneration]);
 
   const handleUpdatePanelTitle = useCallback(async (panelId: string, newTitle: string) => {
-    // updatePanelTitle handles DB
     await updatePanelTitle(panelId, newTitle);
-    // Toast is handled in updatePanelTitle
   }, [updatePanelTitle]);
 
   const handleOpenRegenerateImageDialog = useCallback((panelId: string, imageIndex: number, imageUrl: string, originalPrompt?: string) => {
@@ -165,11 +154,9 @@ export default function Home() {
   }, [getPanel]);
 
   const handleImageRegenerated = useCallback(async (panelId: string, imageIndex: number, newImageUrl: string, newPromptText: string) => {
-    // updatePanelImage handles DB
     await updatePanelImage(panelId, imageIndex, newImageUrl, newPromptText);
     setIsRegenerateImageDialogOpen(false);
     setSelectedImageForRegeneration(null);
-    // Toast is handled in updatePanelImage
   }, [updatePanelImage]);
 
   const handleOpenEditPanelDialog = useCallback((panelId: string) => {
@@ -181,21 +168,21 @@ export default function Home() {
   }, [getPanel]);
 
   const handlePanelImagesUpdated = useCallback(async (panelId: string, updates: Array<{ imageIndex: number; newImageUrl: string; newPromptText: string }>) => {
-    // updatePanelImages handles DB
     await updatePanelImages(panelId, updates);
     setIsEditPanelDialogOpen(false);
     setPanelForEditing(null);
-    // Toast is handled in updatePanelImages
   }, [updatePanelImages]);
 
 
   const renderContent = () => {
+    // isStoryLoading now refers to localStorage loading, which is usually fast.
+    // You might want to adjust this if localStorage interaction becomes slow or if you add other async setup.
     if (isStoryLoading || isProcessingFile) {
       return (
         <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center z-50 p-4">
           <Loader2 className="h-10 w-10 sm:h-12 sm:w-12 animate-spin text-primary mb-3 sm:mb-4" />
           <p className="text-md sm:text-lg text-foreground text-center">
-            {isStoryLoading ? "Loading your amazing story..." : "Processing your content..."}
+            {isStoryLoading ? "Loading your story..." : "Processing your content..."}
           </p>
         </div>
       );
@@ -212,18 +199,31 @@ export default function Home() {
       );
     }
 
-    if (!rootPanelId) {
+    if (!rootPanelId && panels.length === 0) { // Check panels.length too for initial state
       return (
         <div className="flex items-center justify-center h-full p-4">
           <WelcomeMessage onUploadInitial={handleUploadInitialPanel} onUploadComicBook={handleUploadComicBook} />
         </div>
       );
     }
+    
+    // Ensure rootId is valid before rendering FlowchartDisplay
+    if (!rootPanelId && panels.length > 0) {
+      // This case might happen if storyInfo.rootPanelId is null but panels exist (e.g., corrupted local storage)
+      // Or, if the initial load is still determining the root
+      return (
+        <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center z-50 p-4">
+          <Loader2 className="h-10 w-10 sm:h-12 sm:w-12 animate-spin text-primary mb-3 sm:mb-4" />
+          <p className="text-md sm:text-lg text-foreground text-center">Initializing story map...</p>
+        </div>
+      );
+    }
+
 
     return (
       <FlowchartDisplay
         panels={panels}
-        rootId={rootPanelId}
+        rootId={rootPanelId} // rootPanelId should be valid here
         onGenerateNext={handleOpenGenerateDialog}
         onBranch={handleOpenGenerateDialog} 
         onUpdateTitle={handleUpdatePanelTitle}
@@ -241,7 +241,7 @@ export default function Home() {
           onUploadInitialPanel={handleUploadInitialPanel}
           onUploadComicBook={handleUploadComicBook}
           onNewStory={handleNewStory}
-          hasStory={!!rootPanelId && !isStoryLoading} // Disable New Story if loading or no story
+          hasStory={!!rootPanelId || panels.length > 0} 
         />
         <main className="flex-1 overflow-hidden relative">
           {renderContent()}
@@ -301,3 +301,4 @@ export default function Home() {
     </ThemeProvider>
   );
 }
+
