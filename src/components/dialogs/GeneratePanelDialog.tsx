@@ -113,12 +113,33 @@ const GeneratePanelDialog: FC<GeneratePanelDialogProps> = ({ isOpen, onClose, pa
   };
 
   const handleSuggestPrompts = async () => {
-    if (!parentPanel || parentPanel.imageUrls.length === 0) return;
+    if (!parentPanel && prompts.length === 0) {
+        toast({ title: "Cannot Suggest", description: "No parent panel or initial prompt to base suggestions on.", variant: "destructive"});
+        return;
+    }
+    
+    // Determine context image for suggestions:
+    // 1. Custom context of the first prompt field if set.
+    // 2. Default context (parent panel's first image) if the first prompt field has no custom context.
+    // 3. Null if neither is available (should be rare if parentPanel is present for dialog to open)
+    const suggestionContextImageUrl = 
+        (prompts.length > 0 && prompts[0].customContextImageUrl) 
+        ? prompts[0].customContextImageUrl
+        : getDefaultContextImageUrl();
+
+    if (!suggestionContextImageUrl) {
+        toast({ title: "Context Needed", description: "Please set a context image for the first prompt or ensure parent panel has an image.", variant: "destructive"});
+        return;
+    }
+
     setIsSuggesting(true);
     try {
-      const textContext = parentPanel.userDescription || parentPanel.promptsUsed?.join('; ') || "A comic panel scene.";
+      // Text context can be from the first prompt if filled, or parent panel's info
+      const firstPromptText = prompts.length > 0 && prompts[0].text.trim() !== '' ? prompts[0].text.trim() : null;
+      const textContext = firstPromptText || parentPanel?.userDescription || parentPanel?.promptsUsed?.join('; ') || "A comic panel scene.";
+
       const result = await suggestComicPanelPrompts({ 
-        currentPanelPrimaryImageUrl: parentPanel.imageUrls[0],
+        currentPanelPrimaryImageUrl: suggestionContextImageUrl,
         currentPanelTextContext: textContext,
       });
       setSuggestedPrompts(result.suggestedPrompts);
@@ -204,6 +225,11 @@ const GeneratePanelDialog: FC<GeneratePanelDialogProps> = ({ isOpen, onClose, pa
   const activePromptsCount = prompts.filter(p => p.text.trim() !== '').length;
   const defaultCtxImg = getDefaultContextImageUrl();
 
+  const suggestionButtonText = prompts.length > 0 && prompts[0].customContextImageUrl 
+    ? "Suggest Prompts (uses Image 1 custom context)"
+    : "Suggest Prompts (uses default context)";
+
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
@@ -281,9 +307,9 @@ const GeneratePanelDialog: FC<GeneratePanelDialogProps> = ({ isOpen, onClose, pa
           </ScrollArea>
 
           <div className="mt-4 flex flex-col gap-2">
-              <Button onClick={handleSuggestPrompts} disabled={isSuggesting || !parentPanel} variant="outline" size="sm">
+              <Button onClick={handleSuggestPrompts} disabled={isSuggesting || (!parentPanel && prompts.length === 0)} variant="outline" size="sm">
                   {isSuggesting ? ( <Loader2 className="mr-2 h-4 w-4 animate-spin" /> ) : ( <Wand2 className="mr-2 h-4 w-4" /> )}
-                  Suggest Prompts (uses default context)
+                  {suggestionButtonText}
               </Button>
               { (suggestedPrompts.length > 0 || isSuggesting) && (
                   <SuggestedPromptsDisplay
@@ -327,3 +353,4 @@ const GeneratePanelDialog: FC<GeneratePanelDialogProps> = ({ isOpen, onClose, pa
 };
 
 export default GeneratePanelDialog;
+
