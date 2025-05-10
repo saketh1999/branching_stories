@@ -24,6 +24,7 @@ interface FlowchartDisplayProps {
   onBranch: (panelId: string) => void;
   onUpdateTitle: (panelId: string, newTitle: string) => void;
   onRegenerateImage: (panelId: string, imageIndex: number, imageUrl: string, originalPrompt?: string) => void;
+  onEditPanel: (panelId: string) => void; // New prop
 }
 
 const nodeTypes = {
@@ -77,6 +78,7 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
   onBranch,
   onUpdateTitle,
   onRegenerateImage,
+  onEditPanel, // Destructure new prop
 }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState<ReactFlowNodeData>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -94,7 +96,7 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
         newNodes.push({
           id: panel.id,
           type: 'comicPanelNode',
-          data: { panel, onGenerateNext, onBranch, onUpdateTitle, onRegenerateImage },
+          data: { panel, onGenerateNext, onBranch, onUpdateTitle, onRegenerateImage, onEditPanel }, // Pass onEditPanel to node data
           position: position,
           draggable: true, // Make nodes draggable
         });
@@ -117,7 +119,7 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
     }
     setNodes(newNodes);
     setEdges(newEdges);
-  }, [panels, rootId, onGenerateNext, onBranch, onUpdateTitle, onRegenerateImage, setNodes, setEdges]);
+  }, [panels, rootId, onGenerateNext, onBranch, onUpdateTitle, onRegenerateImage, onEditPanel, setNodes, setEdges]);
 
   const onConnect = useCallback(
     (params: Connection | Edge) => setEdges((eds) => addEdge(params, eds)),

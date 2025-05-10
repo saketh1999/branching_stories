@@ -127,6 +127,41 @@ export function useStoryState() {
     []
   );
 
+  const updatePanelImages = useCallback(
+    (panelId: string, updates: Array<{ imageIndex: number; newImageUrl: string; newPromptText: string }>) => {
+      setPanels(prevPanels =>
+        prevPanels.map(panel => {
+          if (panel.id === panelId) {
+            const updatedImageUrls = [...panel.imageUrls];
+            // Initialize prompts array carefully based on existing or new length
+            let updatedPromptsUsed = panel.promptsUsed ? [...panel.promptsUsed] : Array(panel.imageUrls.length).fill('');
+             // Ensure promptsUsed array is long enough to accommodate all images
+            while(updatedPromptsUsed.length < panel.imageUrls.length) {
+                updatedPromptsUsed.push('');
+            }
+
+            updates.forEach(update => {
+              if (update.imageIndex >= 0 && update.imageIndex < updatedImageUrls.length) {
+                updatedImageUrls[update.imageIndex] = update.newImageUrl;
+                // Ensure specific index exists before assignment
+                if (update.imageIndex < updatedPromptsUsed.length) {
+                    updatedPromptsUsed[update.imageIndex] = update.newPromptText;
+                } else { // This case should ideally not be hit if lengths are managed properly
+                    console.warn(`Prompt index ${update.imageIndex} out of bounds for panel ${panelId}`);
+                }
+              }
+            });
+            
+            return { ...panel, imageUrls: updatedImageUrls, promptsUsed: updatedPromptsUsed };
+          }
+          return panel;
+        })
+      );
+    },
+    []
+  );
+
+
   const resetStory = useCallback(() => {
     setPanels([]);
     setRootPanelId(null);
@@ -141,7 +176,8 @@ export function useStoryState() {
     getChildren,
     resetStory,
     updatePanelTitle,
-    updatePanelImage, // Export new function
+    updatePanelImage,
+    updatePanelImages, // Export new function
     lastInitialPanelId, 
   };
 }

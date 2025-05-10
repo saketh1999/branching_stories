@@ -8,13 +8,14 @@ import FlowchartDisplay from '@/components/story/FlowchartDisplay';
 import UploadInitialPanelDialog from '@/components/dialogs/UploadInitialPanelDialog';
 import GeneratePanelDialog from '@/components/dialogs/GeneratePanelDialog';
 import RegenerateImageDialog, { type RegenerateImageDetails } from '@/components/dialogs/RegenerateImageDialog';
+import EditPanelDialog from '@/components/dialogs/EditPanelDialog'; // New Dialog
 import { useStoryState } from '@/hooks/useStoryState';
 import type { ComicPanelData } from '@/types/story';
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from 'lucide-react';
 
 export default function Home() {
-  const { panels, rootPanelId, addPanel, getPanel, resetStory, updatePanelTitle, updatePanelImage } = useStoryState();
+  const { panels, rootPanelId, addPanel, getPanel, resetStory, updatePanelTitle, updatePanelImage, updatePanelImages } = useStoryState();
   const { toast } = useToast();
 
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
@@ -24,6 +25,9 @@ export default function Home() {
 
   const [isRegenerateImageDialogOpen, setIsRegenerateImageDialogOpen] = useState(false);
   const [selectedImageForRegeneration, setSelectedImageForRegeneration] = useState<RegenerateImageDetails | null>(null);
+
+  const [isEditPanelDialogOpen, setIsEditPanelDialogOpen] = useState(false);
+  const [panelForEditing, setPanelForEditing] = useState<ComicPanelData | null>(null);
 
 
   const handleUploadInitialPanel = useCallback(() => {
@@ -109,6 +113,21 @@ export default function Home() {
     // Toast is handled within RegenerateImageDialog
   }, [updatePanelImage]);
 
+  const handleOpenEditPanelDialog = useCallback((panelId: string) => {
+    const panel = getPanel(panelId);
+    if (panel) {
+      setPanelForEditing(panel);
+      setIsEditPanelDialogOpen(true);
+    }
+  }, [getPanel]);
+
+  const handlePanelImagesUpdated = useCallback((panelId: string, updates: Array<{ imageIndex: number; newImageUrl: string; newPromptText: string }>) => {
+    updatePanelImages(panelId, updates);
+    setIsEditPanelDialogOpen(false);
+    setPanelForEditing(null);
+    // Toast is handled within EditPanelDialog
+  }, [updatePanelImages]);
+
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground antialiased">
@@ -137,6 +156,7 @@ export default function Home() {
             onBranch={handleOpenGenerateDialog} 
             onUpdateTitle={handleUpdatePanelTitle}
             onRegenerateImage={handleOpenRegenerateImageDialog}
+            onEditPanel={handleOpenEditPanelDialog} // Pass new handler
           />
         )}
       </main>
@@ -170,6 +190,19 @@ export default function Home() {
           imageDetails={selectedImageForRegeneration}
           allPanels={panels}
           onImageRegenerated={handleImageRegenerated}
+        />
+      )}
+
+      {panelForEditing && (
+        <EditPanelDialog
+          isOpen={isEditPanelDialogOpen}
+          onClose={() => {
+            setIsEditPanelDialogOpen(false);
+            setPanelForEditing(null);
+          }}
+          panelToEdit={panelForEditing}
+          allPanels={panels}
+          onPanelImagesUpdated={handlePanelImagesUpdated}
         />
       )}
     </div>

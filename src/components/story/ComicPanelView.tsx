@@ -6,7 +6,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { ComicPanelData } from '@/types/story';
-import { Sparkles, GitFork, Info, Edit3, Check, X, RefreshCcw } from 'lucide-react';
+import { Sparkles, GitFork, Info, Edit3, Check, X, RefreshCcw, Edit2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from '@/lib/utils';
 
@@ -16,9 +16,10 @@ interface ComicPanelViewProps {
   onBranch: (panelId: string) => void;
   onUpdateTitle: (panelId: string, newTitle: string) => void;
   onRegenerateImage: (panelId: string, imageIndex: number, imageUrl: string, originalPrompt?: string) => void;
+  onEditPanel: (panelId: string) => void; // New prop for editing the entire panel
 }
 
-const ComicPanelView: FC<ComicPanelViewProps> = ({ panel, onGenerateNext, onBranch, onUpdateTitle, onRegenerateImage }) => {
+const ComicPanelView: FC<ComicPanelViewProps> = ({ panel, onGenerateNext, onBranch, onUpdateTitle, onRegenerateImage, onEditPanel }) => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editingTitleValue, setEditingTitleValue] = useState(panel.title || '');
 
@@ -107,6 +108,16 @@ const ComicPanelView: FC<ComicPanelViewProps> = ({ panel, onGenerateNext, onBran
                 </Tooltip>
               </TooltipProvider>
             )}
+            <TooltipProvider>
+              <Tooltip delayDuration={100}>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={() => onEditPanel(panel.id)} className="h-7 w-7">
+                    <Edit2 className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top"><p>Edit Panel Images</p></TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             {(panel.userDescription || (panel.promptsUsed && panel.promptsUsed.length > 0)) && (
               <TooltipProvider>
                 <Tooltip delayDuration={300}>
