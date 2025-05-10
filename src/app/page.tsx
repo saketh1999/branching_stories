@@ -134,6 +134,7 @@ export default function Home() {
             setSelectedPanelForGeneration(null);
           }}
           parentPanel={selectedPanelForGeneration}
+          allPanels={panels} // Pass all panels for context selection
           onPanelGenerated={handlePanelGenerated} // Updated handler
         />
       )}

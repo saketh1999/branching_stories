@@ -3,8 +3,9 @@
 'use server';
 /**
  * @fileOverview Flow for generating a new comic panel with multiple images based on text prompts.
+ * Each prompt can now have its own specific visual context image.
  *
- * - generateComicPanel - A function that generates multiple comic panel images using an array of prompts.
+ * - generateComicPanel - A function that generates multiple comic panel images.
  * - GenerateComicPanelInput - The input type for the generateComicPanel function.
  * - GenerateComicPanelOutput - The return type for the generateComicPanel function.
  */
@@ -12,17 +13,20 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
+const PromptWithContextSchema = z.object({
+  promptText: z.string().min(1, "Prompt text cannot be empty."),
+  contextImageUrl: z.string().describe(
+    "Data URI of an image to use as context for this specific prompt. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
+  ),
+});
+export type PromptWithContext = z.infer<typeof PromptWithContextSchema>;
+
 const GenerateComicPanelInputSchema = z.object({
-  promptsToGenerate: z
-    .array(z.string().min(1, "Prompt cannot be empty."))
+  promptsWithContext: z
+    .array(PromptWithContextSchema)
     .min(1, "At least one prompt is required.")
     .max(4, "A maximum of 4 images can be generated.")
-    .describe('Array of text prompts, one for each desired image in the new panel (1-4 prompts).'),
-  previousPanelContextImageUrl: z
-    .string()
-    .describe(
-      "The primary image Data URI from the previous comic panel, to provide visual context. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
-    ),
+    .describe('Array of prompt-context pairs, one for each desired image in the new panel.'),
 });
 export type GenerateComicPanelInput = z.infer<typeof GenerateComicPanelInputSchema>;
 
@@ -39,9 +43,6 @@ export async function generateComicPanel(input: GenerateComicPanelInput): Promis
   return generateComicPanelFlow(input);
 }
 
-// Note: The ai.definePrompt is not directly used here for multiple image generation in this setup.
-// We will call ai.generate multiple times within the flow.
-
 const generateComicPanelFlow = ai.defineFlow(
   {
     name: 'generateComicPanelFlow',
@@ -51,32 +52,31 @@ const generateComicPanelFlow = ai.defineFlow(
   async (input) => {
     const generatedImageUrls: string[] = [];
 
-    for (const promptText of input.promptsToGenerate) {
+    for (const promptItem of input.promptsWithContext) {
       const {media} = await ai.generate({
         model: 'googleai/gemini-2.0-flash-exp',
-        prompt: [ // Context image first, then the specific text prompt for this image
-          {media: {url: input.previousPanelContextImageUrl}},
-          {text: `Generate a comic panel image for the following scene, continuing from the style and context of the provided previous panel image: "${promptText}"`},
+        prompt: [ 
+          {media: {url: promptItem.contextImageUrl}}, // Use specific context image for this prompt
+          {text: `Generate a comic panel image for the following scene, drawing style and context from the provided image: "${promptItem.promptText}"`},
         ],
         config: {
-          responseModalities: ['TEXT', 'IMAGE'], // TEXT modality is often required even if not directly used.
+          responseModalities: ['TEXT', 'IMAGE'], 
         },
       });
       
       if (media.url) {
         generatedImageUrls.push(media.url);
       } else {
-        // Handle cases where an image might not be generated, though unlikely with current models if TEXT/IMAGE specified
-        console.warn(`Image generation did not return a URL for prompt: "${promptText}"`);
-        // Potentially throw an error or push a placeholder, depending on desired error handling
-        // For now, we'll assume success if no error is thrown by ai.generate
+        console.warn(`Image generation did not return a URL for prompt: "${promptItem.promptText}"`);
+        // Consider throwing an error or pushing a placeholder
       }
     }
     
-    if (generatedImageUrls.length !== input.promptsToGenerate.length) {
+    if (generatedImageUrls.length !== input.promptsWithContext.length) {
         throw new Error("Mismatch between number of prompts and generated images. Some images may have failed to generate.")
     }
 
     return {generatedImageUrls};
   }
 );
+
