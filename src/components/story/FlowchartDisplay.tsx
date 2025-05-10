@@ -80,7 +80,7 @@ const calculateNodePositions = (
 const PAGE_NODE_WIDTH = 180; 
 const PAGE_NODE_HEIGHT = 260;
 const PAGE_SPACING = 10; // Reduced for smaller screens
-const PAGES_PER_ROW_SM = 2; 
+const PAGES_PER_ROW_SM = 1; // Changed to 1 for very small screens
 const PAGES_PER_ROW_MD = 3;
 const GROUP_NODE_CONTENT_PADDING = 15; // Reduced padding
 
