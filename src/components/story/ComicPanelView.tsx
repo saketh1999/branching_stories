@@ -1,10 +1,12 @@
 
-import type { FC } from 'react';
+import type { FC, KeyboardEvent } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import type { ComicPanelData } from '@/types/story';
-import { Sparkles, GitFork, Info } from 'lucide-react';
+import { Sparkles, GitFork, Info, Edit3, Check, X } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from '@/lib/utils';
 
@@ -12,56 +14,120 @@ interface ComicPanelViewProps {
   panel: ComicPanelData;
   onGenerateNext: (panelId: string) => void;
   onBranch: (panelId: string) => void;
+  onUpdateTitle: (panelId: string, newTitle: string) => void;
 }
 
-const ComicPanelView: FC<ComicPanelViewProps> = ({ panel, onGenerateNext, onBranch }) => {
-  const panelTitle = panel.parentId ? `Panel ${panel.id.substring(0,4)}...` : "Initial Panel";
-  
+const ComicPanelView: FC<ComicPanelViewProps> = ({ panel, onGenerateNext, onBranch, onUpdateTitle }) => {
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editingTitleValue, setEditingTitleValue] = useState(panel.title || '');
+
+  useEffect(() => {
+    setEditingTitleValue(panel.title || '');
+  }, [panel.title]);
+
+  const handleTitleEditSubmit = () => {
+    if (editingTitleValue.trim() !== (panel.title || '')) {
+      onUpdateTitle(panel.id, editingTitleValue.trim());
+    }
+    setIsEditingTitle(false);
+  };
+
+  const handleTitleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleTitleEditSubmit();
+    } else if (e.key === 'Escape') {
+      setEditingTitleValue(panel.title || '');
+      setIsEditingTitle(false);
+    }
+  };
+
   let descriptionContent: React.ReactNode;
   if (panel.userDescription) {
-    descriptionContent = <p>{panel.userDescription}</p>;
+    descriptionContent = <p><strong>User Description:</strong> {panel.userDescription}</p>;
   } else if (panel.promptsUsed && panel.promptsUsed.length > 0) {
     descriptionContent = (
-      <ul className="list-disc pl-4">
-        {panel.promptsUsed.map((prompt, index) => (
-          <li key={index} className="text-xs"><strong>Image {index + 1}:</strong> {prompt}</li>
-        ))}
-      </ul>
+      <>
+        <p className="font-semibold mb-1">Prompts Used:</p>
+        <ul className="list-disc pl-4 space-y-1">
+          {panel.promptsUsed.map((prompt, index) => (
+            <li key={index} className="text-xs"><strong>Image {index + 1}:</strong> {prompt}</li>
+          ))}
+        </ul>
+      </>
     );
   } else {
-    descriptionContent = <p>No description available.</p>;
+    descriptionContent = <p>No detailed description or prompts available.</p>;
   }
 
   const hasMultipleImages = panel.imageUrls.length > 1;
+  const displayTitle = panel.title || `Panel ${panel.id.substring(0,4)}...`;
 
   return (
-    <Card className="w-72 sm:w-80 md:w-96 max-w-sm overflow-hidden bg-card shadow-md">
+    <Card className="w-72 sm:w-80 md:w-96 max-w-sm overflow-hidden bg-card shadow-md flex flex-col">
       <CardHeader className="p-3">
-        <CardTitle className="flex items-center justify-between text-base font-semibold text-card-foreground truncate">
-          <span className="truncate" title={panelTitle}>{panelTitle}</span>
-          {(panel.userDescription || (panel.promptsUsed && panel.promptsUsed.length > 0)) && (
-             <TooltipProvider>
-              <Tooltip delayDuration={300}>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0">
-                     <Info className="h-4 w-4 text-muted-foreground" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent 
-                    className="max-w-xs break-words bg-popover text-popover-foreground p-2 rounded-md shadow-lg text-xs" 
-                    side="top"
-                    // Allow interaction if content is complex, e.g. scrollable if many prompts
-                    // onPointerDownOutside={(e) => e.preventDefault()} 
-                >
-                  {descriptionContent}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+        <div className="flex items-center justify-between gap-2">
+          {isEditingTitle ? (
+            <div className="flex-grow flex items-center gap-1">
+              <Input
+                type="text"
+                value={editingTitleValue}
+                onChange={(e) => setEditingTitleValue(e.target.value)}
+                onKeyDown={handleTitleKeyDown}
+                onBlur={handleTitleEditSubmit} // Save on blur
+                autoFocus
+                className="h-8 text-sm flex-grow"
+              />
+              <Button variant="ghost" size="icon" onClick={handleTitleEditSubmit} className="h-7 w-7 shrink-0">
+                <Check className="h-4 w-4 text-green-500" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => { setIsEditingTitle(false); setEditingTitleValue(panel.title || '');}} className="h-7 w-7 shrink-0">
+                <X className="h-4 w-4 text-red-500" />
+              </Button>
+            </div>
+          ) : (
+            <CardTitle 
+              className="text-base font-semibold text-card-foreground truncate cursor-pointer hover:text-primary"
+              title={`Click pencil to edit. ${displayTitle}`}
+              onClick={() => setIsEditingTitle(true)}
+            >
+              {displayTitle}
+            </CardTitle>
           )}
-        </CardTitle>
+          <div className="flex items-center shrink-0">
+            {!isEditingTitle && (
+              <TooltipProvider>
+                <Tooltip delayDuration={100}>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" onClick={() => setIsEditingTitle(true)} className="h-7 w-7">
+                      <Edit3 className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top"><p>Edit Title</p></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            {(panel.userDescription || (panel.promptsUsed && panel.promptsUsed.length > 0)) && (
+              <TooltipProvider>
+                <Tooltip delayDuration={300}>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7">
+                       <Info className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent 
+                      className="max-w-xs break-words bg-popover text-popover-foreground p-3 rounded-md shadow-lg text-xs" 
+                      side="top"
+                  >
+                    {descriptionContent}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+        </div>
       </CardHeader>
       <CardContent className={cn(
-        "p-0 aspect-[4/3] relative bg-muted",
+        "p-0 aspect-[4/3] relative bg-muted flex-grow",
         hasMultipleImages && "grid grid-cols-2 grid-rows-2 gap-px" // gap-px for thin lines
       )}>
         {panel.imageUrls.map((url, index) => (
@@ -92,3 +158,4 @@ const ComicPanelView: FC<ComicPanelViewProps> = ({ panel, onGenerateNext, onBran
 };
 
 export default ComicPanelView;
+

@@ -18,9 +18,9 @@ const AppHeader: FC<AppHeaderProps> = ({ onUploadInitialPanel, onNewStory, hasSt
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Branching Tales</h1>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={onUploadInitialPanel} disabled={hasStory}>
+          <Button variant="outline" onClick={onUploadInitialPanel}>
             <PlusSquare className="mr-2 h-4 w-4" />
-            Upload First Panel Images
+            Add Starting Panel Images
           </Button>
           <Button variant="destructive" onClick={onNewStory} disabled={!hasStory}>
             <Trash2 className="mr-2 h-4 w-4" />
@@ -33,3 +33,4 @@ const AppHeader: FC<AppHeaderProps> = ({ onUploadInitialPanel, onNewStory, hasSt
 };
 
 export default AppHeader;
+

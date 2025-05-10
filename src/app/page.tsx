@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from 'lucide-react';
 
 export default function Home() {
-  const { panels, rootPanelId, addPanel, getPanel, resetStory } = useStoryState();
+  const { panels, rootPanelId, addPanel, getPanel, resetStory, updatePanelTitle } = useStoryState();
   const { toast } = useToast();
 
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
@@ -22,16 +22,13 @@ export default function Home() {
   const [isProcessingFile, setIsProcessingFile] = useState(false);
 
   const handleUploadInitialPanel = useCallback(() => {
-    if (rootPanelId) {
-      toast({ title: "Story Exists", description: "Please start a new story to upload another initial panel.", variant: "default" });
-      return;
-    }
+    // Dialog can always open. The logic for chaining or starting new is in useStoryState.
     setIsUploadDialogOpen(true);
-  }, [rootPanelId, toast]);
+  }, []);
 
   const handleNewStory = useCallback(() => {
     resetStory();
-    toast({ title: "New Story Started", description: "Your canvas is clear. Upload images to begin!"});
+    toast({ title: "New Story Started", description: "Your canvas is clear. Add starting panel images to begin!"});
   }, [resetStory, toast]);
 
   // Updated to handle multiple files
@@ -52,9 +49,10 @@ export default function Home() {
 
     Promise.all(fileReadPromises)
       .then(imageUrls => {
+        // Pass parentId as null. useStoryState will handle chaining if rootPanelId already exists.
         addPanel({ imageUrls, parentId: null, userDescription: description });
         setIsUploadDialogOpen(false);
-        toast({ title: "Panel Uploaded!", description: `${imageUrls.length} image(s) started your story.` });
+        toast({ title: "Panel Uploaded!", description: `${imageUrls.length} image(s) added to your story.` });
       })
       .catch(error => {
         console.error("Error reading files:", error);
@@ -78,7 +76,7 @@ export default function Home() {
     if (selectedPanelForGeneration) {
       addPanel({ 
         imageUrls: newPanelImageUrls, 
-        parentId: selectedPanelForGeneration.id,
+        parentId: selectedPanelForGeneration.id, // Explicit parent for generated panels
         promptsUsed
       });
     }
@@ -87,12 +85,17 @@ export default function Home() {
      // Toast is now handled within GeneratePanelDialog upon success/failure
   }, [addPanel, selectedPanelForGeneration]);
 
+  const handleUpdatePanelTitle = useCallback((panelId: string, newTitle: string) => {
+    updatePanelTitle(panelId, newTitle);
+    toast({ title: "Panel Renamed", description: `Panel title updated to "${newTitle.substring(0,30)}...".`})
+  }, [updatePanelTitle, toast]);
+
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground antialiased">
       <AppHeader 
         onUploadInitialPanel={handleUploadInitialPanel}
         onNewStory={handleNewStory}
-        hasStory={!!rootPanelId}
+        hasStory={!!rootPanelId} // Still useful for "New Story" button disability
       />
       <main className="flex-1 overflow-hidden relative">
         {isProcessingFile && (
@@ -112,6 +115,7 @@ export default function Home() {
             rootId={rootPanelId}
             onGenerateNext={handleOpenGenerateDialog}
             onBranch={handleOpenGenerateDialog} 
+            onUpdateTitle={handleUpdatePanelTitle}
           />
         )}
       </main>
@@ -136,3 +140,4 @@ export default function Home() {
     </div>
   );
 }
+

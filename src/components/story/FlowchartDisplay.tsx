@@ -1,3 +1,4 @@
+
 import type { FC } from 'react';
 import { useCallback, useEffect, useMemo } from 'react';
 import ReactFlow, {
@@ -21,6 +22,7 @@ interface FlowchartDisplayProps {
   rootId: string | null;
   onGenerateNext: (panelId: string) => void;
   onBranch: (panelId: string) => void;
+  onUpdateTitle: (panelId: string, newTitle: string) => void;
 }
 
 const nodeTypes = {
@@ -43,7 +45,7 @@ const calculateNodePositions = (
 
   // Increased spacing for better readability and to accommodate larger cards
   const HORIZONTAL_SPACING_SIBLING = 420; 
-  const VERTICAL_SPACING_LEVEL = 400;
+  const VERTICAL_SPACING_LEVEL = 450; // Increased vertical spacing slightly for taller cards with editable title
 
   const y = level * VERTICAL_SPACING_LEVEL;
   let x;
@@ -72,6 +74,7 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
   rootId,
   onGenerateNext,
   onBranch,
+  onUpdateTitle,
 }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState<ReactFlowNodeData>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -89,7 +92,7 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
         newNodes.push({
           id: panel.id,
           type: 'comicPanelNode',
-          data: { panel, onGenerateNext, onBranch },
+          data: { panel, onGenerateNext, onBranch, onUpdateTitle },
           position: position,
           draggable: true, // Make nodes draggable
         });
@@ -112,7 +115,7 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
     }
     setNodes(newNodes);
     setEdges(newEdges);
-  }, [panels, rootId, onGenerateNext, onBranch, setNodes, setEdges]);
+  }, [panels, rootId, onGenerateNext, onBranch, onUpdateTitle, setNodes, setEdges]);
 
   const onConnect = useCallback(
     (params: Connection | Edge) => setEdges((eds) => addEdge(params, eds)),
@@ -158,3 +161,4 @@ const FlowchartDisplay: FC<FlowchartDisplayProps> = (props) => (
 );
 
 export default FlowchartDisplay;
+
