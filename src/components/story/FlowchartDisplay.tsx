@@ -1,6 +1,6 @@
 
 import type { FC } from 'react';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react'; // Added useState
 import ReactFlow, {
   Controls,
   Background,
@@ -46,11 +46,11 @@ const calculateNodePositions = (
   if (!panel || panel.isComicBookPage) return []; 
 
   // Base spacing - can be adjusted, perhaps even dynamically based on viewport later
-  const BASE_HORIZONTAL_SPACING = 400; 
-  const BASE_VERTICAL_SPACING = 400;
+  const BASE_HORIZONTAL_SPACING = 350; // Reduced for tighter packing initially
+  const BASE_VERTICAL_SPACING = 380;  // Reduced for tighter packing initially
 
-  const HORIZONTAL_SPACING_SIBLING = panel.isGroupNode ? BASE_HORIZONTAL_SPACING * 1.75 : BASE_HORIZONTAL_SPACING; 
-  const VERTICAL_SPACING_LEVEL = panel.isGroupNode ? BASE_VERTICAL_SPACING * 1.75 : BASE_VERTICAL_SPACING; 
+  const HORIZONTAL_SPACING_SIBLING = panel.isGroupNode ? BASE_HORIZONTAL_SPACING * 1.5 : BASE_HORIZONTAL_SPACING; 
+  const VERTICAL_SPACING_LEVEL = panel.isGroupNode ? BASE_VERTICAL_SPACING * 1.5 : BASE_VERTICAL_SPACING; 
 
   const y = level * VERTICAL_SPACING_LEVEL;
   let x;
@@ -77,15 +77,15 @@ const calculateNodePositions = (
   return positionsArray;
 };
 
-const PAGE_NODE_WIDTH = 180; // Smaller base for better fit on small screens
+const PAGE_NODE_WIDTH = 180; 
 const PAGE_NODE_HEIGHT = 260;
-const PAGE_SPACING = 15; 
-const PAGES_PER_ROW_SM = 2; // For small screens (ReactFlow group internal)
-const PAGES_PER_ROW_MD = 3; // For medium screens up (ReactFlow group internal)
-const GROUP_NODE_CONTENT_PADDING = 20;
+const PAGE_SPACING = 10; // Reduced for smaller screens
+const PAGES_PER_ROW_SM = 2; 
+const PAGES_PER_ROW_MD = 3;
+const GROUP_NODE_CONTENT_PADDING = 15; // Reduced padding
 
-const GROUP_NODE_HEADER_ACTUAL_HEIGHT = 56; 
-const GROUP_NODE_FOOTER_ACTUAL_HEIGHT = 74;
+const GROUP_NODE_HEADER_ACTUAL_HEIGHT = 50; // Adjusted based on new styles
+const GROUP_NODE_FOOTER_ACTUAL_HEIGHT = 68; // Adjusted based on new styles
 
 const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
   panels,
@@ -137,10 +137,14 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
           const groupContentAreaWidth = (maxPagesInAnyRow * (PAGE_NODE_WIDTH + PAGE_SPACING)) - (maxPagesInAnyRow > 0 ? PAGE_SPACING : 0);
           const groupContentAreaHeight = (numRows * (PAGE_NODE_HEIGHT + PAGE_SPACING)) - (numRows > 0 ? PAGE_SPACING : 0);
           
-          const groupWidth = Math.max(pagesPerRow === PAGES_PER_ROW_SM ? 300 : 350, groupContentAreaWidth + GROUP_NODE_CONTENT_PADDING * 2); 
-          const groupHeight = Math.max(pagesPerRow === PAGES_PER_ROW_SM ? 200 : 250, 
+          // Make group node width more adaptive to content
+          const baseGroupWidth = pagesPerRow === PAGES_PER_ROW_SM ? 280 : 320; // Smaller base width
+          const groupWidth = Math.max(baseGroupWidth, groupContentAreaWidth + GROUP_NODE_CONTENT_PADDING * 2); 
+          const baseGroupHeight = pagesPerRow === PAGES_PER_ROW_SM ? 180 : 220; // Smaller base height
+
+          const groupHeight = Math.max(baseGroupHeight, 
             GROUP_NODE_HEADER_ACTUAL_HEIGHT + 
-            (pageChildren.length > 0 ? groupContentAreaHeight : PAGE_NODE_HEIGHT ) + 
+            (pageChildren.length > 0 ? groupContentAreaHeight : PAGE_NODE_HEIGHT / 2 ) + // Smaller placeholder if empty
             GROUP_NODE_FOOTER_ACTUAL_HEIGHT + 
             (GROUP_NODE_CONTENT_PADDING * 2)
           );
@@ -187,6 +191,11 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
             data: { panel, allPanels: panels, onGenerateNext, onBranch, onUpdateTitle, onRegenerateImage, onEditPanel },
             position: position,
             draggable: true,
+            // Style for regular panel nodes for responsiveness (max-width can be useful)
+            style: {
+              width: 'clamp(280px, 30vw, 380px)', // Responsive width
+              // height will be auto based on content due to ComicPanelView's flex structure
+            }
           });
         }
       });
@@ -200,8 +209,8 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
                     id: `e-${panel.parentId}-${panel.id}`,
                     source: panel.parentId,
                     target: panel.id,
-                    markerEnd: { type: MarkerType.ArrowClosed, color: 'hsl(var(--primary))', width: 20, height: 20 },
-                    style: { stroke: 'hsl(var(--primary))', strokeWidth: 2.5 },
+                    markerEnd: { type: MarkerType.ArrowClosed, color: 'hsl(var(--primary))', width: 18, height: 18 }, // Slightly smaller marker
+                    style: { stroke: 'hsl(var(--primary))', strokeWidth: 2 }, // Thinner line
                     animated: true,
                     zIndex: 0,
                 });
@@ -225,8 +234,8 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
                             source: panel.id,
                             target: nextPageInGroup.id,
                             type: 'smoothstep', 
-                            markerEnd: { type: MarkerType.ArrowClosed, color: 'hsl(var(--secondary))', width:15, height:15 },
-                            style: { stroke: 'hsl(var(--secondary))', strokeWidth: 2 },
+                            markerEnd: { type: MarkerType.ArrowClosed, color: 'hsl(var(--secondary))', width:12, height:12 }, // Smaller marker
+                            style: { stroke: 'hsl(var(--secondary))', strokeWidth: 1.5 }, // Thinner line
                             zIndex: 0, 
                         });
                     }
@@ -254,7 +263,7 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
   }
 
   return (
-    <div className="w-full h-[calc(100vh-4rem)] sm:h-[calc(100vh-var(--header-height,10rem))] overflow-hidden" style={{ '--header-height': '4rem' } as React.CSSProperties}>
+    <div className="w-full h-[calc(100vh-4rem)] sm:h-[calc(100vh-var(--header-height,4rem))] overflow-hidden" style={{ '--header-height': '4rem' } as React.CSSProperties}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -263,15 +272,22 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
         onConnect={onConnect}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.15, minZoom: 0.05, maxZoom: 1.2 }} 
-        minZoom={0.05}
-        maxZoom={2}
+        fitViewOptions={{ padding: 0.1, minZoom: 0.1, maxZoom: 1 }} // Adjusted padding and zoom levels
+        minZoom={0.05} // Allow more zoom out
+        maxZoom={1.5} // Allow a bit more zoom in
         attributionPosition="bottom-left"
         className="bg-background"
       >
         <Controls className="fill-primary stroke-primary text-primary" />
-        <MiniMap nodeStrokeWidth={3} zoomable pannable className="!bg-muted !border-border shadow-lg hidden sm:block"/>
-        <Background color="hsl(var(--border))" gap={16} size={1} />
+        <MiniMap nodeStrokeWidth={2} zoomable pannable className="!bg-muted !border-border shadow-lg hidden md:block" nodeColor={(n) => {
+          if (n.type === 'comicPanelNode') {
+            if ((n.data as ReactFlowNodeData).panel.isGroupNode) return 'hsl(var(--primary))';
+            if ((n.data as ReactFlowNodeData).panel.isComicBookPage) return 'hsl(var(--secondary))';
+            return 'hsl(var(--accent))';
+          }
+          return '#eee';
+        }}/>
+        <Background color="hsl(var(--border))" gap={24} size={0.8} /> {/* Larger gap, smaller dots */}
       </ReactFlow>
     </div>
   );
@@ -284,3 +300,4 @@ const FlowchartDisplay: FC<FlowchartDisplayProps> = (props) => (
 );
 
 export default FlowchartDisplay;
+
