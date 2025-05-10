@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from 'lucide-react';
 
 export default function Home() {
-  const { panels, rootPanelId, addPanel, getPanel, getChildren, resetStory } = useStoryState();
+  const { panels, rootPanelId, addPanel, getPanel, resetStory } = useStoryState();
   const { toast } = useToast();
 
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
@@ -51,7 +51,7 @@ export default function Home() {
   };
 
   const handleOpenGenerateDialog = useCallback((panelId: string) => {
-    const panel = getPanel(panelId);
+    const panel = getPanel(panelId); // getPanel is still useful here for fetching data for the dialog
     if (panel) {
       setSelectedPanelForGeneration(panel);
       setIsGenerateDialogOpen(true);
@@ -77,7 +77,7 @@ export default function Home() {
         onNewStory={handleNewStory}
         hasStory={!!rootPanelId}
       />
-      <main className="flex-1 p-2 sm:p-4 md:p-6 lg:p-8 overflow-auto relative">
+      <main className="flex-1 overflow-hidden relative"> {/* Changed p- to overflow-hidden for ReactFlow */}
         {isProcessingFile && (
           <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center z-50">
             <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
@@ -85,16 +85,17 @@ export default function Home() {
           </div>
         )}
         {!rootPanelId && !isProcessingFile && (
-          <WelcomeMessage onUploadInitial={handleUploadInitialPanel} />
+          <div className="flex items-center justify-center h-full"> {/* Center WelcomeMessage */}
+            <WelcomeMessage onUploadInitial={handleUploadInitialPanel} />
+          </div>
         )}
+        {/* FlowchartDisplay will now take full height of main if rootPanelId exists */}
         {rootPanelId && !isProcessingFile && (
           <FlowchartDisplay
             panels={panels}
             rootId={rootPanelId}
             onGenerateNext={handleOpenGenerateDialog}
-            onBranch={handleOpenGenerateDialog} // Same action for now, could differentiate later
-            getPanel={getPanel}
-            getChildren={getChildren}
+            onBranch={handleOpenGenerateDialog} // Same action for now
           />
         )}
       </main>

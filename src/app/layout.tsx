@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { GeistSans } from 'geist/font/sans';
 import { GeistMono } from 'geist/font/mono';
 import './globals.css';
+import 'reactflow/dist/style.css'; // Import ReactFlow styles
 import { Toaster } from "@/components/ui/toaster";
 
 const geistSans = GeistSans; // Direct usage as per new Geist package
