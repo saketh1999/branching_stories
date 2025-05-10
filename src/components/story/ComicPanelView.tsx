@@ -28,7 +28,7 @@ const ComicPanelView: FC<ComicPanelViewProps> = ({ panel, onGenerateNext, onBran
   }, [panel.title]);
 
   const handleTitleEditSubmit = () => {
-    const currentDefaultTitle = panel.isComicBookPage ? `Page ${panel.pageNumber}` : `Panel ${panel.id.substring(0,4)}`;
+    const currentDefaultTitle = panel.isComicBookPage ? `Page ${panel.pageNumber}` : (panel.isGroupNode ? `Comic Book ${panel.id.substring(0,4)}` :`Panel ${panel.id.substring(0,4)}`);
     if (editingTitleValue.trim() !== (panel.title || '')) {
       onUpdateTitle(panel.id, editingTitleValue.trim() || currentDefaultTitle);
     }
@@ -63,7 +63,7 @@ const ComicPanelView: FC<ComicPanelViewProps> = ({ panel, onGenerateNext, onBran
   }
   
   const defaultTitle = panel.isGroupNode 
-    ? `Comic Book ${panel.id.substring(0,4)}`
+    ? (panel.userDescription || `Comic Book ${panel.id.substring(0,4)}`) // Group node usually has a user description as title
     : panel.isComicBookPage 
     ? `Page ${panel.pageNumber}` 
     : `Panel ${panel.id.substring(0,4)}`;
@@ -77,12 +77,12 @@ const ComicPanelView: FC<ComicPanelViewProps> = ({ panel, onGenerateNext, onBran
           <div className="flex items-center justify-between gap-2">
              {isEditingTitle ? (
               <div className="flex-grow flex items-center gap-1">
-                <Input type="text" value={editingTitleValue} onChange={(e) => setEditingTitleValue(e.target.value)} onKeyDown={handleTitleKeyDown} onBlur={handleTitleEditSubmit} autoFocus className="h-8 text-sm"/>
-                <Button variant="ghost" size="icon" onClick={handleTitleEditSubmit} className="h-7 w-7"><Check className="h-4 w-4 text-green-500" /></Button>
-                <Button variant="ghost" size="icon" onClick={() => { setIsEditingTitle(false); setEditingTitleValue(panel.title || '');}} className="h-7 w-7"><X className="h-4 w-4 text-red-500" /></Button>
+                <Input type="text" value={editingTitleValue} onChange={(e) => setEditingTitleValue(e.target.value)} onKeyDown={handleTitleKeyDown} onBlur={handleTitleEditSubmit} autoFocus className="h-8 text-sm w-full"/>
+                <Button variant="ghost" size="icon" onClick={handleTitleEditSubmit} className="h-7 w-7 shrink-0"><Check className="h-4 w-4 text-green-500" /></Button>
+                <Button variant="ghost" size="icon" onClick={() => { setIsEditingTitle(false); setEditingTitleValue(panel.title || '');}} className="h-7 w-7 shrink-0"><X className="h-4 w-4 text-red-500" /></Button>
               </div>
             ) : (
-              <CardTitle className="text-lg font-semibold text-primary truncate cursor-pointer hover:underline" title={`Click pencil to edit. ${displayTitle}`} onClick={() => setIsEditingTitle(true)}>
+              <CardTitle className="text-lg font-semibold text-primary truncate cursor-pointer hover:underline flex-grow" title={`Click pencil to edit. ${displayTitle}`} onClick={() => setIsEditingTitle(true)}>
                 <BookText className="inline-block mr-2 h-5 w-5 align-text-bottom"/>{displayTitle}
               </CardTitle>
             )}
@@ -96,9 +96,11 @@ const ComicPanelView: FC<ComicPanelViewProps> = ({ panel, onGenerateNext, onBran
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-3 flex-grow flex items-center justify-center">
-          <p className="text-muted-foreground text-sm">{panel.childrenIds.length} page(s) in this comic book.</p>
-          {/* This area is where child page nodes will be rendered by ReactFlow due to parentNode styling */}
+        <CardContent className="p-3 flex-grow flex items-center justify-center relative">
+          {/* Child page nodes are rendered by ReactFlow within the bounds of this group node, not literally inside this CardContent div */}
+          {(!panel.childrenIds || panel.childrenIds.filter(cid => panel.isComicBookPage).length === 0) && (
+            <p className="text-muted-foreground text-sm">This comic book is empty.</p>
+          )}
         </CardContent>
         <CardFooter className="p-3 grid grid-cols-2 gap-2 border-t mt-auto">
           <Button onClick={() => onGenerateNext(panel.id)} size="sm" variant="outline" className="text-xs sm:text-sm"><Sparkles className="mr-1 h-4 w-4" />Next (After Book)</Button>
@@ -116,10 +118,12 @@ const ComicPanelView: FC<ComicPanelViewProps> = ({ panel, onGenerateNext, onBran
           <div className="flex items-center justify-between gap-1">
             {isEditingTitle ? (
               <div className="flex-grow flex items-center gap-1">
-                <Input type="text" value={editingTitleValue} onChange={(e) => setEditingTitleValue(e.target.value)} onKeyDown={handleTitleKeyDown} onBlur={handleTitleEditSubmit} autoFocus className="h-7 text-xs"/>
+                <Input type="text" value={editingTitleValue} onChange={(e) => setEditingTitleValue(e.target.value)} onKeyDown={handleTitleKeyDown} onBlur={handleTitleEditSubmit} autoFocus className="h-7 text-xs w-full"/>
+                 <Button variant="ghost" size="icon" onClick={handleTitleEditSubmit} className="h-6 w-6 shrink-0"><Check className="h-3 w-3 text-green-500" /></Button>
+                <Button variant="ghost" size="icon" onClick={() => { setIsEditingTitle(false); setEditingTitleValue(panel.title || '');}} className="h-6 w-6 shrink-0"><X className="h-3 w-3 text-red-500" /></Button>
               </div>
             ) : (
-              <CardTitle className="text-xs font-semibold text-card-foreground truncate" title={displayTitle}>
+              <CardTitle className="text-xs font-semibold text-card-foreground truncate flex-grow cursor-pointer hover:underline" title={`Click pencil to edit. ${displayTitle}`} onClick={() => setIsEditingTitle(true)}>
                 {displayTitle}
               </CardTitle>
             )}
@@ -143,9 +147,10 @@ const ComicPanelView: FC<ComicPanelViewProps> = ({ panel, onGenerateNext, onBran
               <RefreshCcw className="w-6 h-6 text-white" />
             </div>
         </CardContent>
-        <CardFooter className="p-2 grid grid-cols-2 gap-1">
-          <Button onClick={() => onBranch(panel.id)} size="sm" variant="outline" className="text-[10px] px-1 py-0.5 h-auto"><GitFork className="mr-1 h-3 w-3" />Branch</Button>
-          <Button onClick={() => onEditPanel(panel.id)} size="sm" variant="outline" className="text-[10px] px-1 py-0.5 h-auto"><Edit2 className="mr-1 h-3 w-3" />Edit</Button>
+        {/* Footer for comic book page is minimal to save space */}
+        <CardFooter className="p-1 grid grid-cols-2 gap-1">
+          <Button onClick={() => onBranch(panel.id)} size="sm" variant="outline" className="text-[10px] px-1 py-0.5 h-6"><GitFork className="mr-1 h-3 w-3" />Branch</Button>
+          <Button onClick={() => onEditPanel(panel.id)} size="sm" variant="outline" className="text-[10px] px-1 py-0.5 h-6"><Edit2 className="mr-1 h-3 w-3" />Edit</Button>
         </CardFooter>
       </Card>
     );
@@ -159,12 +164,12 @@ const ComicPanelView: FC<ComicPanelViewProps> = ({ panel, onGenerateNext, onBran
         <div className="flex items-center justify-between gap-2">
           {isEditingTitle ? (
             <div className="flex-grow flex items-center gap-1">
-              <Input type="text" value={editingTitleValue} onChange={(e) => setEditingTitleValue(e.target.value)} onKeyDown={handleTitleKeyDown} onBlur={handleTitleEditSubmit} autoFocus className="h-8 text-sm flex-grow"/>
+              <Input type="text" value={editingTitleValue} onChange={(e) => setEditingTitleValue(e.target.value)} onKeyDown={handleTitleKeyDown} onBlur={handleTitleEditSubmit} autoFocus className="h-8 text-sm w-full flex-grow"/>
               <Button variant="ghost" size="icon" onClick={handleTitleEditSubmit} className="h-7 w-7 shrink-0"><Check className="h-4 w-4 text-green-500" /></Button>
               <Button variant="ghost" size="icon" onClick={() => { setIsEditingTitle(false); setEditingTitleValue(panel.title || '');}} className="h-7 w-7 shrink-0"><X className="h-4 w-4 text-red-500" /></Button>
             </div>
           ) : (
-            <CardTitle className="text-base font-semibold text-card-foreground truncate cursor-pointer hover:text-primary" title={`Click pencil to edit. ${displayTitle}`} onClick={() => setIsEditingTitle(true)}>
+            <CardTitle className="text-base font-semibold text-card-foreground truncate cursor-pointer hover:text-primary flex-grow" title={`Click pencil to edit. ${displayTitle}`} onClick={() => setIsEditingTitle(true)}>
               {displayTitle}
             </CardTitle>
           )}
@@ -196,3 +201,4 @@ const ComicPanelView: FC<ComicPanelViewProps> = ({ panel, onGenerateNext, onBran
 };
 
 export default ComicPanelView;
+
