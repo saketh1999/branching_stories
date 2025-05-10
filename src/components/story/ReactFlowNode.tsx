@@ -17,52 +17,92 @@ export interface ReactFlowNodeData {
 const ReactFlowNode: FC<NodeProps<ReactFlowNodeData>> = ({ data, isConnectable, selected, sourcePosition = Position.Bottom, targetPosition = Position.Top }) => {
   const { panel, onGenerateNext, onBranch, onUpdateTitle, onRegenerateImage, onEditPanel } = data;
 
-  // For group nodes, handles might not be relevant or could be styled differently.
-  // For pages within a group, handles connect them sequentially or to branches.
-  const showHandles = !panel.isGroupNode; // Only show default handles for non-group nodes
+  // Default handles for regular panels
+  const showDefaultHandles = !panel.isGroupNode && !panel.isComicBookPage;
+  // Specific handles for comic book pages (for branching out or connecting to next page if that's handled by edges)
+  const showPageHandles = panel.isComicBookPage;
+  // Group nodes might have specific connection points if needed, or connections go to/from the node itself (handled by ReactFlow)
 
   return (
     <div className={cn(
-        "transition-shadow duration-300 rounded-lg",
-        selected && "ring-2 ring-primary ring-offset-2 ring-offset-background shadow-2xl",
-        panel.isGroupNode && "overflow-visible", // Ensure group node can contain children visually
-        panel.isComicBookPage && "shadow-md hover:shadow-lg"
+        "transition-all duration-200 ease-in-out rounded-lg", // Ensure rounded-lg is applied
+        selected && "ring-4 ring-accent ring-offset-2 ring-offset-background shadow-2xl scale-105",
+        panel.isGroupNode && "overflow-visible", 
+        panel.isComicBookPage && "shadow-lg hover:shadow-xl transform hover:scale-102",
+        !panel.isGroupNode && !panel.isComicBookPage && "shadow-lg hover:shadow-xl" // Regular panel shadow
       )}
       style={{
-        // Override width/height if panel is a group node, ReactFlow style prop for parent node handles this
+        // Width/height are set by ReactFlow for the node container.
+        // For group nodes, this is dynamically calculated in FlowchartDisplay.
+        // For page nodes, this is fixed.
+        // For regular panels, this is fixed.
+        width: panel.isGroupNode ? undefined : (panel.isComicBookPage ? '200px' : undefined), // Let group node width be dynamic from style prop
+        height: panel.isGroupNode ? undefined : (panel.isComicBookPage ? '280px' : undefined),
       }}
     >
-      {showHandles && !panel.isComicBookPage && ( // Standard panels get top/bottom handles
+      {showDefaultHandles && (
         <>
           <Handle 
             type="target" 
             position={targetPosition} 
             isConnectable={isConnectable} 
-            className="!bg-primary !w-3 !h-3"
+            className="!bg-primary !w-3.5 !h-3.5 !border-2 !border-background"
+            style={{ zIndex: 10 }}
           />
           <Handle 
             type="source" 
             position={sourcePosition} 
             isConnectable={isConnectable} 
-            className="!bg-primary !w-3 !h-3"
+            className="!bg-primary !w-3.5 !h-3.5 !border-2 !border-background"
+            style={{ zIndex: 10 }}
           />
         </>
       )}
-       {panel.isComicBookPage && ( // Page nodes might have different handle logic for branching
+       {showPageHandles && ( // Handles for comic book pages
         <>
+         {/* Target for previous page connection or branching into the page */}
          <Handle 
             type="target" 
             position={Position.Left} 
             isConnectable={isConnectable} 
-            className="!bg-secondary !w-2.5 !h-2.5"
-            style={{top: '50%'}}
+            className="!bg-secondary !w-3 !h-3 !-ml-1 !border-background !border"
+            style={{top: '50%', zIndex: 10}}
           />
+          {/* Source for next page connection or branching from the page */}
           <Handle 
             type="source" 
             position={Position.Right} 
             isConnectable={isConnectable} 
-            className="!bg-secondary !w-2.5 !h-2.5"
-            style={{top: '50%'}}
+            className="!bg-secondary !w-3 !h-3 !-mr-1 !border-background !border"
+            style={{top: '50%', zIndex: 10}}
+          />
+          {/* Optional: Handle for branching out from bottom of a page (if design requires) */}
+           <Handle
+            type="source"
+            position={Position.Bottom}
+            id={`branch-from-page-${panel.id}`}
+            isConnectable={isConnectable}
+            className="!bg-primary !w-3 !h-3 !-mb-1 !border-background !border"
+            style={{ zIndex: 10 }}
+          />
+        </>
+      )}
+      {/* Group nodes can also have handles if direct connections to the group are needed */}
+      {panel.isGroupNode && (
+         <>
+          <Handle 
+            type="target" 
+            position={Position.Top} 
+            isConnectable={isConnectable} 
+            className="!bg-primary !w-4 !h-4 !border-2 !border-background" // Larger for groups
+            style={{ zIndex: 10 }}
+          />
+          <Handle 
+            type="source" 
+            position={Position.Bottom} 
+            isConnectable={isConnectable} 
+            className="!bg-primary !w-4 !h-4 !border-2 !border-background"
+            style={{ zIndex: 10 }}
           />
         </>
       )}

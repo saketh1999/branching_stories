@@ -21,7 +21,7 @@ interface AddComicBookArgs {
 export function useStoryState() {
   const [panels, setPanels] = useState<ComicPanelData[]>([]);
   const [rootPanelId, setRootPanelId] = useState<string | null>(null);
-  const [lastInitialPanelId, setLastInitialPanelId] = useState<string | null>(null);
+  const [lastInitialPanelId, setLastInitialPanelId] = useState<string | null>(null); // Tracks the ID of the last top-level item (initial panel or comic book group)
 
   const getPanel = useCallback(
     (panelId: string): ComicPanelData | undefined => {
@@ -57,17 +57,26 @@ export function useStoryState() {
       let actualParentId: string | null = intendedParentId;
       let panelTitle = `Panel ${newPanelId.substring(0, 4)}`; 
 
+      // If it's an initial panel (user provided description)
       if (userDescription) { 
         panelTitle = userDescription.substring(0, 50) + (userDescription.length > 50 ? '...' : '');
         if (!rootPanelId) { 
-          actualParentId = null;
+          // This is the very first panel, becomes the root
+          actualParentId = null; 
           setRootPanelId(newPanelId);
-        } else { 
+        } else if (lastInitialPanelId) {
+          // This is a subsequent initial panel, parent it to the last top-level item
           actualParentId = lastInitialPanelId;
+        } else {
+          // Fallback if rootPanelId exists but lastInitialPanelId is somehow null (should not happen in normal flow)
+          actualParentId = null; 
+          if (!rootPanelId) setRootPanelId(newPanelId);
         }
       } else if (promptsUsed && promptsUsed.length > 0) { 
+        // Generated panel
         panelTitle = promptsUsed[0].substring(0, 50) + (promptsUsed[0].length > 50 ? '...' : '');
       }
+
 
       const newPanel: ComicPanelData = {
         id: newPanelId,
@@ -91,8 +100,13 @@ export function useStoryState() {
         return updatedPanels;
       });
 
-      if (userDescription || !actualParentId) { 
-        setLastInitialPanelId(newPanelId);
+      // If this panel is a top-level item (no parent or its parent was a previous top-level item)
+      if (!actualParentId || (actualParentId === lastInitialPanelId && !userDescription)) {
+         // If it's truly a new root (userDescription sets this) or no parent
+        if (userDescription || !actualParentId) {
+            setLastInitialPanelId(newPanelId);
+            if (!rootPanelId) setRootPanelId(newPanelId);
+        }
       }
       
       return newPanelId;
@@ -106,13 +120,22 @@ export function useStoryState() {
         throw new Error("Cannot create a comic book with no pages.");
       }
 
-      const comicBookRootId = uuidv4();
-      const comicBookRootPanel: ComicPanelData = {
-        id: comicBookRootId,
-        imageUrls: [], // Group node might not have its own images, or could show a cover
-        title: comicBookTitle.trim() || `Comic Book ${comicBookRootId.substring(0,4)}`,
-        userDescription: `Comic Book: ${comicBookTitle.trim()}`,
-        parentId: rootPanelId ? lastInitialPanelId : null,
+      const comicBookGroupId = uuidv4();
+      const actualComicBookTitle = comicBookTitle.trim() || `Comic Book ${comicBookGroupId.substring(0,4)}`;
+      
+      let comicBookParentId: string | null = null;
+      if (!rootPanelId) {
+        setRootPanelId(comicBookGroupId);
+      } else {
+        comicBookParentId = lastInitialPanelId;
+      }
+
+      const comicBookGroupNode: ComicPanelData = {
+        id: comicBookGroupId,
+        imageUrls: [], // Group node itself might not display images in the grid, or could show a cover if we adapt
+        title: actualComicBookTitle,
+        userDescription: `Comic Book: ${actualComicBookTitle}`, // Store full title here for group node info
+        parentId: comicBookParentId, 
         childrenIds: [], // Will be populated with page IDs
         isGroupNode: true,
         isComicBookPage: false,
@@ -120,13 +143,13 @@ export function useStoryState() {
 
       const pagePanelsToAdd: ComicPanelData[] = pageImageUrls.map((imageUrl, index) => {
         const pageId = uuidv4();
-        comicBookRootPanel.childrenIds.push(pageId);
+        comicBookGroupNode.childrenIds.push(pageId); // Add page ID to group's children
         return {
           id: pageId,
-          imageUrls: [imageUrl],
-          title: `Page ${index + 1}`,
-          promptsUsed: [`Page ${index + 1} of "${comicBookTitle}"`], // Auto-prompt for page
-          parentId: comicBookRootId,
+          imageUrls: [imageUrl], // Each page has one image
+          title: `Page ${index + 1}`, // Default title for a page
+          // promptsUsed: [`Page ${index + 1} of "${actualComicBookTitle}"`], // Could be used for context
+          parentId: comicBookGroupId, // Parent is the group node
           childrenIds: [],
           isGroupNode: false,
           isComicBookPage: true,
@@ -135,21 +158,19 @@ export function useStoryState() {
       });
       
       setPanels(prevPanels => {
-        let updatedPanels = [...prevPanels, comicBookRootPanel, ...pagePanelsToAdd];
-        if (comicBookRootPanel.parentId) {
+        let updatedPanels = [...prevPanels, comicBookGroupNode, ...pagePanelsToAdd];
+        if (comicBookGroupNode.parentId) {
+          // Link this new comic book group to the previous lastInitialPanelId
           updatedPanels = updatedPanels.map(p =>
-            p.id === comicBookRootPanel.parentId ? { ...p, childrenIds: [...p.childrenIds, comicBookRootId] } : p
+            p.id === comicBookGroupNode.parentId ? { ...p, childrenIds: [...p.childrenIds, comicBookGroupId] } : p
           );
         }
         return updatedPanels;
       });
 
-      if (!rootPanelId && !comicBookRootPanel.parentId) {
-        setRootPanelId(comicBookRootId);
-      }
-      setLastInitialPanelId(comicBookRootId); // The new comic book group is the latest "initial" item
+      setLastInitialPanelId(comicBookGroupId); // This new comic book group is now the last top-level item
 
-      return comicBookRootId;
+      return comicBookGroupId;
     },
     [rootPanelId, lastInitialPanelId]
   );
@@ -157,9 +178,20 @@ export function useStoryState() {
 
   const updatePanelTitle = useCallback((panelId: string, newTitle: string) => {
     setPanels(prevPanels =>
-      prevPanels.map(p =>
-        p.id === panelId ? { ...p, title: newTitle.trim() || (p.isComicBookPage ? `Page ${p.pageNumber}` : `Panel ${p.id.substring(0,4)}`) } : p
-      )
+      prevPanels.map(p => {
+        if (p.id === panelId) {
+          let finalTitle = newTitle.trim();
+          if (!finalTitle) { // Ensure there's always a title
+            if (p.isGroupNode) finalTitle = p.userDescription || `Comic Book ${p.id.substring(0,4)}`;
+            else if (p.isComicBookPage) finalTitle = `Page ${p.pageNumber}`;
+            else finalTitle = `Panel ${p.id.substring(0,4)}`;
+          }
+          // For group nodes, also update userDescription if it's the primary title source
+          const updatedUserDescription = p.isGroupNode ? (p.userDescription?.startsWith("Comic Book:") ? `Comic Book: ${finalTitle}`: finalTitle) : p.userDescription;
+          return { ...p, title: finalTitle, userDescription: updatedUserDescription };
+        }
+        return p;
+      })
     );
   }, []);
 

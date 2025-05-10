@@ -43,10 +43,10 @@ const calculateNodePositions = (
   if (visitedPositions.has(panelId)) return [];
 
   const panel = panelMap.get(panelId);
-  if (!panel || panel.isComicBookPage) return [];
+  if (!panel || panel.isComicBookPage) return []; // Skip comic book pages for top-level layout
 
-  const HORIZONTAL_SPACING_SIBLING = panel.isGroupNode ? 600 : 420; 
-  const VERTICAL_SPACING_LEVEL = panel.isGroupNode ? 650 : 450; // Increased for larger group nodes
+  const HORIZONTAL_SPACING_SIBLING = panel.isGroupNode ? 700 : 420; // Increased for larger group nodes
+  const VERTICAL_SPACING_LEVEL = panel.isGroupNode ? 700 : 450; // Increased for larger group nodes
 
   const y = level * VERTICAL_SPACING_LEVEL;
   let x;
@@ -60,6 +60,7 @@ const calculateNodePositions = (
   visitedPositions.set(panelId, { x, y });
   let positionsArray = [{ id: panelId, position: { x, y }, level }];
 
+  // Only consider non-page children for further recursive layout
   const childrenToLayout = panel.childrenIds
     .map(id => panelMap.get(id))
     .filter(child => child && !child.isComicBookPage) as ComicPanelData[];
@@ -76,16 +77,16 @@ const calculateNodePositions = (
 // Constants for group node internal layout
 const PAGE_NODE_WIDTH = 200;
 const PAGE_NODE_HEIGHT = 280;
-const PAGE_SPACING = 15;
-const PAGES_PER_ROW = 3;
-const GROUP_NODE_CONTENT_PADDING = 20; // Padding around the content area (pages) within the group node
+const PAGE_SPACING = 20; // Increased spacing
+const PAGES_PER_ROW = 3; 
+const GROUP_NODE_CONTENT_PADDING = 25; // Increased padding
 
-// Estimated heights from ComicPanelView.tsx (CardHeader p-3 + h-8 input + p-3; CardFooter p-3 + h-9 button + p-3)
-// p-3 is 0.75rem. Assuming 1rem = 16px, p-3 = 12px.
-// Header: 12px (top_pad) + 32px (input_height) + 12px (bottom_pad) = 56px.
-// Footer: 12px (top_pad) + 36px (button_height) + 12px (bottom_pad) = 60px.
-const GROUP_NODE_HEADER_ACTUAL_HEIGHT = 56; 
-const GROUP_NODE_FOOTER_ACTUAL_HEIGHT = 60;
+// Actual heights from ComicPanelView.tsx (CardHeader p-3 + (input or title) + p-3; CardFooter p-3 + button + p-3)
+// p-3 = 12px. Title text-lg approx 18px line height. Buttons h-9 (sm size for footer).
+// Group Header: approx 12(pad) + 24 (title height) + 12(pad) = 48px. (Can be taller if title wraps)
+// Group Footer: approx 12(pad) + 36(button) + 12(pad) = 60px.
+const GROUP_NODE_HEADER_ACTUAL_HEIGHT = 56; // Adjusted based on current ComicPanelView for group nodes
+const GROUP_NODE_FOOTER_ACTUAL_HEIGHT = 74; // Adjusted for two buttons in footer
 
 const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
   panels,
@@ -116,18 +117,18 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
             .filter(p => p?.isComicBookPage)
             .sort((a, b) => (a.pageNumber || 0) - (b.pageNumber || 0));
           
-          const numRows = Math.ceil(pageChildren.length / PAGES_PER_ROW);
-          const maxPagesInAnyRow = Math.min(pageChildren.length, PAGES_PER_ROW);
+          const numRows = pageChildren.length > 0 ? Math.ceil(pageChildren.length / PAGES_PER_ROW) : 1; // Ensure at least 1 row for min height
+          const maxPagesInAnyRow = pageChildren.length > 0 ? Math.min(pageChildren.length, PAGES_PER_ROW) : 0;
 
           const groupContentAreaWidth = (maxPagesInAnyRow * (PAGE_NODE_WIDTH + PAGE_SPACING)) - (maxPagesInAnyRow > 0 ? PAGE_SPACING : 0);
           const groupContentAreaHeight = (numRows * (PAGE_NODE_HEIGHT + PAGE_SPACING)) - (numRows > 0 ? PAGE_SPACING : 0);
           
-          const groupWidth = Math.max(320, groupContentAreaWidth + GROUP_NODE_CONTENT_PADDING * 2); // Min width for group title etc.
-          const groupHeight = Math.max(200, // Minimum height
+          const groupWidth = Math.max(350, groupContentAreaWidth + GROUP_NODE_CONTENT_PADDING * 2); 
+          const groupHeight = Math.max(250, 
             GROUP_NODE_HEADER_ACTUAL_HEIGHT + 
-            groupContentAreaHeight + 
+            (pageChildren.length > 0 ? groupContentAreaHeight : PAGE_NODE_HEIGHT ) + // min content height if empty
             GROUP_NODE_FOOTER_ACTUAL_HEIGHT + 
-            (GROUP_NODE_CONTENT_PADDING * 2) // Top and bottom padding for content area
+            (GROUP_NODE_CONTENT_PADDING * 2)
           );
 
           newNodes.push({
@@ -139,12 +140,12 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
             style: { 
               width: `${groupWidth}px`, 
               height: `${groupHeight}px`, 
-              backgroundColor: 'hsl(var(--muted))', 
-              border: '2px dashed hsl(var(--primary))',
+              backgroundColor: 'hsl(var(--card))', 
+              border: '3px solid hsl(var(--primary))', // Thicker border for group
               borderRadius: 'var(--radius)',
-              boxShadow: 'var(--shadow-md)',
+              boxShadow: 'var(--shadow-lg)', // More prominent shadow
             },
-            zIndex: 0,
+            zIndex: 0, // Group nodes behind their children
           });
 
           pageChildren.forEach((pagePanel, index) => {
@@ -159,13 +160,13 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
                 y: GROUP_NODE_HEADER_ACTUAL_HEIGHT + GROUP_NODE_CONTENT_PADDING + rowIndex * (PAGE_NODE_HEIGHT + PAGE_SPACING)
               },
               parentNode: panel.id,
-              extent: 'parent',
-              draggable: true,
-              zIndex: 1,
+              extent: 'parent', // Keep page nodes within the group node
+              draggable: true, // Pages can be moved within the group
+              zIndex: 1, // Page nodes on top of their parent group
             });
           });
 
-        } else if (!panel.isComicBookPage) {
+        } else if (!panel.isComicBookPage) { // Regular panel, not a page
           newNodes.push({
             id: panel.id,
             type: 'comicPanelNode',
@@ -176,9 +177,12 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
         }
       });
 
+      // Create Edges
       panels.forEach(panel => {
+        // Edges from parent to non-page children (regular panels or group nodes)
         if (panel.parentId && panelMap.has(panel.parentId) && !panel.isComicBookPage) {
           const parentPanel = panelMap.get(panel.parentId)!;
+          // Only draw edge if parent is not a group node OR if parent is group node but child is NOT a page
           if (!parentPanel.isGroupNode || (parentPanel.isGroupNode && !panel.isComicBookPage)) {
              if (newNodes.find(n => n.id === panel.parentId) && newNodes.find(n => n.id === panel.id)) {
                  newEdges.push({
@@ -186,12 +190,14 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
                     source: panel.parentId,
                     target: panel.id,
                     markerEnd: { type: MarkerType.ArrowClosed, color: 'hsl(var(--primary))', width: 20, height: 20 },
-                    style: { stroke: 'hsl(var(--primary))', strokeWidth: 2 },
+                    style: { stroke: 'hsl(var(--primary))', strokeWidth: 2.5 },
                     animated: true,
+                    zIndex: 0,
                 });
             }
           }
         }
+        // Edges between sequential pages within a comic book group
         if (panel.isComicBookPage && panel.pageNumber && panel.parentId) {
             const parentGroup = panelMap.get(panel.parentId);
             if (parentGroup && parentGroup.isGroupNode) {
@@ -200,17 +206,18 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
                     .filter(p => p?.isComicBookPage)
                     .sort((a, b) => (a.pageNumber || 0) - (b.pageNumber || 0));
                 const currentIndex = siblings.findIndex(p => p.id === panel.id);
+
                 if (currentIndex !== -1 && currentIndex < siblings.length - 1) {
                     const nextPageInGroup = siblings[currentIndex + 1];
-                    if (newNodes.find(n => n.id === panel.id) && newNodes.find(n => n.id === nextPageInGroup.id)) {
+                     if (newNodes.find(n => n.id === panel.id) && newNodes.find(n => n.id === nextPageInGroup.id)) {
                         newEdges.push({
                             id: `e-page-${panel.id}-${nextPageInGroup.id}`,
                             source: panel.id,
                             target: nextPageInGroup.id,
-                            type: 'smoothstep',
-                            markerEnd: { type: MarkerType.ArrowClosed, color: 'hsl(var(--muted-foreground))', width:15, height:15 },
-                            style: { stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1.5 },
-                            zIndex: 0, 
+                            type: 'smoothstep', // Or 'default' if pages are directly aligned
+                            markerEnd: { type: MarkerType.ArrowClosed, color: 'hsl(var(--secondary))', width:15, height:15 },
+                            style: { stroke: 'hsl(var(--secondary))', strokeWidth: 2 },
+                            zIndex: 0, // Ensure page-to-page edges are behind nodes if overlap
                         });
                     }
                 }
@@ -221,7 +228,7 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
     setNodes(newNodes);
     setEdges(newEdges);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panels, rootId, onGenerateNext, onBranch, onUpdateTitle, onRegenerateImage, onEditPanel]);
+  }, [panels, rootId]); // Dependencies kept minimal, ensure callbacks don't cause loops if passed directly
 
   const onConnect = useCallback(
     (params: Connection | Edge) => setEdges((eds) => addEdge(params, eds)),
@@ -232,7 +239,7 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
      return null; 
   }
   
-  if (rootId && nodes.length === 0) {
+  if (rootId && nodes.length === 0 && panels.length > 0) { // Check panels.length to distinguish from initial empty state
     return <p className="text-center text-muted-foreground p-8">Loading story map...</p>;
   }
 
@@ -246,13 +253,14 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
         onConnect={onConnect}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.2, minZoom: 0.1 }}
+        fitViewOptions={{ padding: 0.25, minZoom: 0.05, maxZoom: 1.5 }} // Adjusted padding and zoom
         minZoom={0.05}
+        maxZoom={2}
         attributionPosition="bottom-left"
         className="bg-background"
       >
         <Controls className="fill-primary stroke-primary text-primary" />
-        <MiniMap nodeStrokeWidth={3} zoomable pannable className="!bg-muted !border-border"/>
+        <MiniMap nodeStrokeWidth={3} zoomable pannable className="!bg-muted !border-border shadow-lg"/>
         <Background color="hsl(var(--border))" gap={24} size={1.5} />
       </ReactFlow>
     </div>
@@ -266,4 +274,3 @@ const FlowchartDisplay: FC<FlowchartDisplayProps> = (props) => (
 );
 
 export default FlowchartDisplay;
-

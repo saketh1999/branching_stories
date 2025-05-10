@@ -2,9 +2,9 @@
 export interface ComicPanelData {
   id: string;
   imageUrls: string[]; // Array of 1 to 4 image data URIs
-  title?: string; // User-editable title for the panel
+  title?: string; // User-editable title for the panel. For group nodes, this is the comic book title.
   promptsUsed?: string[]; // For generated panels, array of prompts (1 per image). Length matches imageUrls.
-  userDescription?: string; // For initial uploaded panel, single description for all its images.
+  userDescription?: string; // For initial uploaded panel, single description for all its images. For comic book group nodes, this holds the main title/description.
   parentId: string | null;
   childrenIds: string[];
   isGroupNode?: boolean; // True if this panel represents a group of other panels (e.g., a comic book)
