@@ -9,10 +9,11 @@ export interface ReactFlowNodeData {
   onGenerateNext: (panelId: string) => void;
   onBranch: (panelId: string) => void;
   onUpdateTitle: (panelId: string, newTitle: string) => void;
+  onRegenerateImage: (panelId: string, imageIndex: number, imageUrl: string, originalPrompt?: string) => void;
 }
 
 const ReactFlowNode: FC<NodeProps<ReactFlowNodeData>> = ({ data, isConnectable, selected }) => {
-  const { panel, onGenerateNext, onBranch, onUpdateTitle } = data;
+  const { panel, onGenerateNext, onBranch, onUpdateTitle, onRegenerateImage } = data;
 
   return (
     <div className={`shadow-lg hover:shadow-xl transition-shadow duration-300 ${selected ? 'ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg' : ''}`}>
@@ -27,6 +28,7 @@ const ReactFlowNode: FC<NodeProps<ReactFlowNodeData>> = ({ data, isConnectable, 
         onGenerateNext={onGenerateNext} 
         onBranch={onBranch}
         onUpdateTitle={onUpdateTitle} 
+        onRegenerateImage={onRegenerateImage}
       />
       <Handle 
         type="source" 
@@ -39,4 +41,3 @@ const ReactFlowNode: FC<NodeProps<ReactFlowNodeData>> = ({ data, isConnectable, 
 };
 
 export default ReactFlowNode;
-

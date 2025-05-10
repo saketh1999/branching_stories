@@ -7,13 +7,14 @@ import WelcomeMessage from '@/components/WelcomeMessage';
 import FlowchartDisplay from '@/components/story/FlowchartDisplay';
 import UploadInitialPanelDialog from '@/components/dialogs/UploadInitialPanelDialog';
 import GeneratePanelDialog from '@/components/dialogs/GeneratePanelDialog';
+import RegenerateImageDialog, { type RegenerateImageDetails } from '@/components/dialogs/RegenerateImageDialog';
 import { useStoryState } from '@/hooks/useStoryState';
 import type { ComicPanelData } from '@/types/story';
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from 'lucide-react';
 
 export default function Home() {
-  const { panels, rootPanelId, addPanel, getPanel, resetStory, updatePanelTitle } = useStoryState();
+  const { panels, rootPanelId, addPanel, getPanel, resetStory, updatePanelTitle, updatePanelImage } = useStoryState();
   const { toast } = useToast();
 
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
@@ -21,8 +22,11 @@ export default function Home() {
   const [selectedPanelForGeneration, setSelectedPanelForGeneration] = useState<ComicPanelData | null>(null);
   const [isProcessingFile, setIsProcessingFile] = useState(false);
 
+  const [isRegenerateImageDialogOpen, setIsRegenerateImageDialogOpen] = useState(false);
+  const [selectedImageForRegeneration, setSelectedImageForRegeneration] = useState<RegenerateImageDetails | null>(null);
+
+
   const handleUploadInitialPanel = useCallback(() => {
-    // Dialog can always open. The logic for chaining or starting new is in useStoryState.
     setIsUploadDialogOpen(true);
   }, []);
 
@@ -31,7 +35,6 @@ export default function Home() {
     toast({ title: "New Story Started", description: "Your canvas is clear. Add starting panel images to begin!"});
   }, [resetStory, toast]);
 
-  // Updated to handle multiple files
   const processUploadedFiles = (files: File[], description: string) => {
     if (files.length === 0) {
         toast({ title: "No Files", description: "Please select at least one image file.", variant: "destructive"});
@@ -49,7 +52,6 @@ export default function Home() {
 
     Promise.all(fileReadPromises)
       .then(imageUrls => {
-        // Pass parentId as null. useStoryState will handle chaining if rootPanelId already exists.
         addPanel({ imageUrls, parentId: null, userDescription: description });
         setIsUploadDialogOpen(false);
         toast({ title: "Panel Uploaded!", description: `${imageUrls.length} image(s) added to your story.` });
@@ -71,18 +73,16 @@ export default function Home() {
     }
   }, [getPanel]);
 
-  // Updated to handle multiple generated images and their prompts
   const handlePanelGenerated = useCallback((newPanelImageUrls: string[], promptsUsed: string[]) => {
     if (selectedPanelForGeneration) {
       addPanel({ 
         imageUrls: newPanelImageUrls, 
-        parentId: selectedPanelForGeneration.id, // Explicit parent for generated panels
+        parentId: selectedPanelForGeneration.id, 
         promptsUsed
       });
     }
     setIsGenerateDialogOpen(false);
     setSelectedPanelForGeneration(null);
-     // Toast is now handled within GeneratePanelDialog upon success/failure
   }, [addPanel, selectedPanelForGeneration]);
 
   const handleUpdatePanelTitle = useCallback((panelId: string, newTitle: string) => {
@@ -90,12 +90,32 @@ export default function Home() {
     toast({ title: "Panel Renamed", description: `Panel title updated to "${newTitle.substring(0,30)}...".`})
   }, [updatePanelTitle, toast]);
 
+  const handleOpenRegenerateImageDialog = useCallback((panelId: string, imageIndex: number, imageUrl: string, originalPrompt?: string) => {
+    const panel = getPanel(panelId);
+    setSelectedImageForRegeneration({
+      panelId,
+      panelTitle: panel?.title,
+      imageIndex,
+      originalImageUrl: imageUrl,
+      originalPrompt,
+    });
+    setIsRegenerateImageDialogOpen(true);
+  }, [getPanel]);
+
+  const handleImageRegenerated = useCallback((panelId: string, imageIndex: number, newImageUrl: string, newPromptText: string) => {
+    updatePanelImage(panelId, imageIndex, newImageUrl, newPromptText);
+    setIsRegenerateImageDialogOpen(false);
+    setSelectedImageForRegeneration(null);
+    // Toast is handled within RegenerateImageDialog
+  }, [updatePanelImage]);
+
+
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground antialiased">
       <AppHeader 
         onUploadInitialPanel={handleUploadInitialPanel}
         onNewStory={handleNewStory}
-        hasStory={!!rootPanelId} // Still useful for "New Story" button disability
+        hasStory={!!rootPanelId}
       />
       <main className="flex-1 overflow-hidden relative">
         {isProcessingFile && (
@@ -116,6 +136,7 @@ export default function Home() {
             onGenerateNext={handleOpenGenerateDialog}
             onBranch={handleOpenGenerateDialog} 
             onUpdateTitle={handleUpdatePanelTitle}
+            onRegenerateImage={handleOpenRegenerateImageDialog}
           />
         )}
       </main>
@@ -123,7 +144,7 @@ export default function Home() {
       <UploadInitialPanelDialog
         isOpen={isUploadDialogOpen}
         onClose={() => setIsUploadDialogOpen(false)}
-        onUpload={processUploadedFiles} // Updated handler
+        onUpload={processUploadedFiles}
       />
       
       {selectedPanelForGeneration && (
@@ -134,11 +155,23 @@ export default function Home() {
             setSelectedPanelForGeneration(null);
           }}
           parentPanel={selectedPanelForGeneration}
-          allPanels={panels} // Pass all panels for context selection
-          onPanelGenerated={handlePanelGenerated} // Updated handler
+          allPanels={panels}
+          onPanelGenerated={handlePanelGenerated}
+        />
+      )}
+
+      {selectedImageForRegeneration && (
+        <RegenerateImageDialog
+          isOpen={isRegenerateImageDialogOpen}
+          onClose={() => {
+            setIsRegenerateImageDialogOpen(false);
+            setSelectedImageForRegeneration(null);
+          }}
+          imageDetails={selectedImageForRegeneration}
+          allPanels={panels}
+          onImageRegenerated={handleImageRegenerated}
         />
       )}
     </div>
   );
 }
-

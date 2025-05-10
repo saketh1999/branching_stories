@@ -101,6 +101,32 @@ export function useStoryState() {
     );
   }, []);
 
+  const updatePanelImage = useCallback(
+    (panelId: string, imageIndex: number, newImageUrl: string, newPromptText?: string) => {
+      setPanels(prevPanels =>
+        prevPanels.map(panel => {
+          if (panel.id === panelId) {
+            const updatedImageUrls = [...panel.imageUrls];
+            updatedImageUrls[imageIndex] = newImageUrl;
+
+            let updatedPromptsUsed = panel.promptsUsed ? [...panel.promptsUsed] : Array(updatedImageUrls.length).fill('');
+            if (newPromptText !== undefined) {
+              // Ensure promptsUsed array is long enough
+              while(updatedPromptsUsed.length < updatedImageUrls.length) {
+                updatedPromptsUsed.push('');
+              }
+              updatedPromptsUsed[imageIndex] = newPromptText;
+            }
+            
+            return { ...panel, imageUrls: updatedImageUrls, promptsUsed: updatedPromptsUsed };
+          }
+          return panel;
+        })
+      );
+    },
+    []
+  );
+
   const resetStory = useCallback(() => {
     setPanels([]);
     setRootPanelId(null);
@@ -115,7 +141,7 @@ export function useStoryState() {
     getChildren,
     resetStory,
     updatePanelTitle,
-    lastInitialPanelId, // Potentially for UI logic if needed, though addPanel handles chaining.
+    updatePanelImage, // Export new function
+    lastInitialPanelId, 
   };
 }
-

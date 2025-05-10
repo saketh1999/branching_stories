@@ -6,7 +6,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { ComicPanelData } from '@/types/story';
-import { Sparkles, GitFork, Info, Edit3, Check, X } from 'lucide-react';
+import { Sparkles, GitFork, Info, Edit3, Check, X, RefreshCcw } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from '@/lib/utils';
 
@@ -15,9 +15,10 @@ interface ComicPanelViewProps {
   onGenerateNext: (panelId: string) => void;
   onBranch: (panelId: string) => void;
   onUpdateTitle: (panelId: string, newTitle: string) => void;
+  onRegenerateImage: (panelId: string, imageIndex: number, imageUrl: string, originalPrompt?: string) => void;
 }
 
-const ComicPanelView: FC<ComicPanelViewProps> = ({ panel, onGenerateNext, onBranch, onUpdateTitle }) => {
+const ComicPanelView: FC<ComicPanelViewProps> = ({ panel, onGenerateNext, onBranch, onUpdateTitle, onRegenerateImage }) => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editingTitleValue, setEditingTitleValue] = useState(panel.title || '');
 
@@ -131,15 +132,23 @@ const ComicPanelView: FC<ComicPanelViewProps> = ({ panel, onGenerateNext, onBran
         hasMultipleImages && "grid grid-cols-2 grid-rows-2 gap-px" // gap-px for thin lines
       )}>
         {panel.imageUrls.map((url, index) => (
-          <div key={index} className="relative w-full h-full overflow-hidden bg-muted-foreground/10">
+          <div 
+            key={index} 
+            className="relative w-full h-full overflow-hidden bg-muted-foreground/10 group cursor-pointer"
+            onClick={() => onRegenerateImage(panel.id, index, url, panel.promptsUsed?.[index])}
+            title="Click to regenerate this image"
+          >
             <Image
               src={url}
               alt={panel.promptsUsed?.[index] || panel.userDescription || `Comic panel image ${index + 1}`}
               layout="fill"
               objectFit="contain"
               data-ai-hint="comic panel image"
-              className="transition-transform duration-300 ease-in-out hover:scale-105"
+              className="transition-transform duration-300 ease-in-out group-hover:scale-105"
             />
+            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <RefreshCcw className="w-8 h-8 text-white" />
+            </div>
           </div>
         ))}
       </CardContent>
@@ -158,4 +167,3 @@ const ComicPanelView: FC<ComicPanelViewProps> = ({ panel, onGenerateNext, onBran
 };
 
 export default ComicPanelView;
-
