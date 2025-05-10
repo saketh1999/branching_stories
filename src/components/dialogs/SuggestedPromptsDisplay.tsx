@@ -2,6 +2,7 @@ import type { FC } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Lightbulb } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area'; // Import ScrollArea
 
 interface SuggestedPromptsDisplayProps {
   prompts: string[];
@@ -30,18 +31,22 @@ const SuggestedPromptsDisplay: FC<SuggestedPromptsDisplayProps> = ({ prompts, on
           AI Prompt Suggestions
         </CardTitle>
       </CardHeader>
-      <CardContent className="grid grid-cols-1 gap-2 p-4 pt-0">
-        {prompts.map((prompt, index) => (
-          <Button
-            key={index}
-            variant="ghost"
-            size="sm"
-            onClick={() => onSelectPrompt(prompt)}
-            className="text-left justify-start p-2 h-auto whitespace-normal hover:bg-accent/20 text-foreground"
-          >
-            {prompt}
-          </Button>
-        ))}
+      <CardContent className="p-4 pt-0">
+        <ScrollArea className="h-40 w-full"> {/* Added ScrollArea with a fixed height */}
+          <div className="grid grid-cols-1 gap-2">
+            {prompts.map((prompt, index) => (
+              <Button
+                key={index}
+                variant="ghost"
+                size="sm"
+                onClick={() => onSelectPrompt(prompt)}
+                className="text-left justify-start p-2 h-auto whitespace-normal hover:bg-accent/20 text-foreground"
+              >
+                {prompt}
+              </Button>
+            ))}
+          </div>
+        </ScrollArea>
       </CardContent>
     </Card>
   );
