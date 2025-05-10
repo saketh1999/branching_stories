@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 
 interface ComicPanelViewProps {
   panel: ComicPanelData;
+  allPanels: ComicPanelData[]; // Added to get child panel info
   onGenerateNext: (panelId: string) => void;
   onBranch: (panelId: string) => void;
   onUpdateTitle: (panelId: string, newTitle: string) => void;
@@ -19,12 +20,11 @@ interface ComicPanelViewProps {
   onEditPanel: (panelId: string) => void;
 }
 
-const ComicPanelView: FC<ComicPanelViewProps> = ({ panel, onGenerateNext, onBranch, onUpdateTitle, onRegenerateImage, onEditPanel }) => {
+const ComicPanelView: FC<ComicPanelViewProps> = ({ panel, allPanels, onGenerateNext, onBranch, onUpdateTitle, onRegenerateImage, onEditPanel }) => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editingTitleValue, setEditingTitleValue] = useState(panel.title || '');
 
   useEffect(() => {
-    // Update editing title when panel.title changes externally (e.g. after initial load or reset)
     const currentDefaultTitle = panel.isGroupNode 
       ? (panel.userDescription || `Comic Book ${panel.id.substring(0,4)}`) 
       : panel.isComicBookPage 
@@ -91,6 +91,12 @@ const ComicPanelView: FC<ComicPanelViewProps> = ({ panel, onGenerateNext, onBran
 
   // Group Node (Comic Book Container) View
   if (panel.isGroupNode) {
+    const childComicBookPages = panel.childrenIds
+      ? panel.childrenIds
+          .map(childId => allPanels.find(p => p.id === childId))
+          .filter((child): child is ComicPanelData => !!child && child.isComicBookPage === true)
+      : [];
+
     return (
       <Card className="w-full h-full flex flex-col bg-card shadow-lg border-primary border-2">
         <CardHeader className="p-3 flex-shrink-0">
@@ -119,7 +125,7 @@ const ComicPanelView: FC<ComicPanelViewProps> = ({ panel, onGenerateNext, onBran
         <CardContent className="p-1 flex-grow relative">
           {/* Child page nodes are rendered by ReactFlow within the bounds defined by parentStyle in FlowchartDisplay */}
           {/* This area is conceptually where child nodes live. It does not need explicit children. */}
-           {(!panel.childrenIds || panel.childrenIds.filter(cid => getPanel(cid)?.isComicBookPage).length === 0) && (
+           {childComicBookPages.length === 0 && (
              <div className="absolute inset-0 flex items-center justify-center">
                 <p className="text-muted-foreground text-center p-4">This comic book is empty. Pages will appear here.</p>
              </div>
@@ -234,13 +240,5 @@ const ComicPanelView: FC<ComicPanelViewProps> = ({ panel, onGenerateNext, onBran
     </Card>
   );
 };
-
-// Helper to get panel from an array, not part of the component
-// This might be better if `allPanels` is passed to ComicPanelView, or fetched via context
-const getPanel = (panelId: string | null, allPanels: ComicPanelData[]): ComicPanelData | undefined => {
-  if (!panelId) return undefined;
-  return allPanels.find(p => p.id === panelId);
-};
-
 
 export default ComicPanelView;

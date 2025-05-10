@@ -134,7 +134,7 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
           newNodes.push({
             id: panel.id,
             type: 'comicPanelNode', 
-            data: { panel, onGenerateNext, onBranch, onUpdateTitle, onRegenerateImage, onEditPanel },
+            data: { panel, allPanels: panels, onGenerateNext, onBranch, onUpdateTitle, onRegenerateImage, onEditPanel },
             position: position,
             draggable: true,
             style: { 
@@ -154,7 +154,7 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
             newNodes.push({
               id: pagePanel.id,
               type: 'comicPanelNode',
-              data: { panel: pagePanel, onGenerateNext, onBranch, onUpdateTitle, onRegenerateImage, onEditPanel },
+              data: { panel: pagePanel, allPanels: panels, onGenerateNext, onBranch, onUpdateTitle, onRegenerateImage, onEditPanel },
               position: { 
                 x: GROUP_NODE_CONTENT_PADDING + colIndex * (PAGE_NODE_WIDTH + PAGE_SPACING), 
                 y: GROUP_NODE_HEADER_ACTUAL_HEIGHT + GROUP_NODE_CONTENT_PADDING + rowIndex * (PAGE_NODE_HEIGHT + PAGE_SPACING)
@@ -170,7 +170,7 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
           newNodes.push({
             id: panel.id,
             type: 'comicPanelNode',
-            data: { panel, onGenerateNext, onBranch, onUpdateTitle, onRegenerateImage, onEditPanel },
+            data: { panel, allPanels: panels, onGenerateNext, onBranch, onUpdateTitle, onRegenerateImage, onEditPanel },
             position: position,
             draggable: true,
           });

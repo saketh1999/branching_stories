@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 
 export interface ReactFlowNodeData {
   panel: ComicPanelData;
+  allPanels: ComicPanelData[]; // Added to pass down to ComicPanelView
   onGenerateNext: (panelId: string) => void;
   onBranch: (panelId: string) => void;
   onUpdateTitle: (panelId: string, newTitle: string) => void;
@@ -15,7 +16,7 @@ export interface ReactFlowNodeData {
 }
 
 const ReactFlowNode: FC<NodeProps<ReactFlowNodeData>> = ({ data, isConnectable, selected, sourcePosition = Position.Bottom, targetPosition = Position.Top }) => {
-  const { panel, onGenerateNext, onBranch, onUpdateTitle, onRegenerateImage, onEditPanel } = data;
+  const { panel, allPanels, onGenerateNext, onBranch, onUpdateTitle, onRegenerateImage, onEditPanel } = data;
 
   // Default handles for regular panels
   const showDefaultHandles = !panel.isGroupNode && !panel.isComicBookPage;
@@ -109,7 +110,8 @@ const ReactFlowNode: FC<NodeProps<ReactFlowNodeData>> = ({ data, isConnectable, 
 
 
       <ComicPanelView 
-        panel={panel} 
+        panel={panel}
+        allPanels={allPanels} 
         onGenerateNext={onGenerateNext} 
         onBranch={onBranch}
         onUpdateTitle={onUpdateTitle} 
