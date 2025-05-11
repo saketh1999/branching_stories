@@ -26,20 +26,19 @@ export default function ThemeToggle() {
     setTheme(theme === "light" ? "dark" : "light")
   }
 
-  // Prevents hydration mismatch by not rendering the button until mounted on client
   if (!mounted) {
-    return  <div className="h-9 w-9 sm:h-10 sm:w-10" /> // Placeholder to prevent layout shift
+    return  <div className="h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10" /> 
   }
 
   return (
     <TooltipProvider delayDuration={200}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="outline" size="icon" onClick={toggleTheme} aria-label="Toggle theme" className="h-9 w-9 sm:h-10 sm:w-10">
+          <Button variant="outline" size="icon" onClick={toggleTheme} aria-label="Toggle theme" className="h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10">
             {theme === 'light' ? (
-              <Moon className="h-[1.1rem] w-[1.1rem] sm:h-[1.2rem] sm:w-[1.2rem]" />
+              <Moon className="h-4 w-4 sm:h-[1.1rem] sm:w-[1.1rem] md:h-[1.2rem] md:w-[1.2rem]" />
             ) : (
-              <Sun className="h-[1.1rem] w-[1.1rem] sm:h-[1.2rem] sm:w-[1.2rem]" />
+              <Sun className="h-4 w-4 sm:h-[1.1rem] sm:w-[1.1rem] md:h-[1.2rem] md:w-[1.2rem]" />
             )}
           </Button>
         </TooltipTrigger>

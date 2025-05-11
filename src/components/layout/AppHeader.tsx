@@ -2,7 +2,8 @@
 import type { FC } from 'react';
 import { Button } from '@/components/ui/button';
 import { BookImage, PlusSquare, Trash2, BookOpenCheck } from 'lucide-react';
-import ThemeToggle from '@/components/ThemeToggle'; // Assuming ThemeToggle is extracted
+import ThemeToggle from '@/components/ThemeToggle'; 
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface AppHeaderProps {
   onUploadInitialPanel: () => void;
@@ -14,34 +15,34 @@ interface AppHeaderProps {
 const AppHeader: FC<AppHeaderProps> = ({ onUploadInitialPanel, onUploadComicBook, onNewStory, hasStory }) => {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-2">
-          <BookImage className="h-7 w-7 sm:h-8 sm:w-8 text-primary" />
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+      <div className="container flex h-14 sm:h-16 items-center justify-between px-3 sm:px-4 md:px-6 lg:px-8">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <BookImage className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-primary" />
+          <h1 className="text-lg sm:text-xl md:text-2xl font-bold tracking-tight text-foreground">
             Branching Tales
           </h1>
         </div>
-        <div className="flex items-center gap-1 sm:gap-2">
-          <TooltipProviderWrapper>
+        <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2">
+          <TooltipProvider delayDuration={200}>
             <TooltipWrapper text="Add Panel Images">
-              <Button variant="outline" size="icon" className="h-9 w-9 sm:w-auto sm:px-3" onClick={onUploadInitialPanel}>
+              <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-auto sm:px-2 md:px-3" onClick={onUploadInitialPanel}>
                 <PlusSquare className="h-4 w-4" />
-                <span className="hidden sm:inline ml-2">Add Images</span>
+                <span className="hidden sm:inline ml-1.5 sm:ml-2 text-xs sm:text-sm">Add Images</span>
               </Button>
             </TooltipWrapper>
             <TooltipWrapper text="Upload Comic Book">
-              <Button variant="outline" size="icon" className="h-9 w-9 sm:w-auto sm:px-3" onClick={onUploadComicBook}>
+              <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-auto sm:px-2 md:px-3" onClick={onUploadComicBook}>
                 <BookOpenCheck className="h-4 w-4" />
-                <span className="hidden sm:inline ml-2">Upload Book</span>
+                <span className="hidden sm:inline ml-1.5 sm:ml-2 text-xs sm:text-sm">Upload Book</span>
               </Button>
             </TooltipWrapper>
             <TooltipWrapper text="New Story">
-              <Button variant="destructive" size="icon" className="h-9 w-9 sm:w-auto sm:px-3" onClick={onNewStory} disabled={!hasStory}>
+              <Button variant="destructive" size="icon" className="h-8 w-8 sm:h-9 sm:w-auto sm:px-2 md:px-3" onClick={onNewStory} disabled={!hasStory}>
                 <Trash2 className="h-4 w-4" />
-                <span className="hidden sm:inline ml-2">New Story</span>
+                <span className="hidden sm:inline ml-1.5 sm:ml-2 text-xs sm:text-sm">New Story</span>
               </Button>
             </TooltipWrapper>
-          </TooltipProviderWrapper>
+          </TooltipProvider>
           <ThemeToggle />
         </div>
       </div>
@@ -49,12 +50,6 @@ const AppHeader: FC<AppHeaderProps> = ({ onUploadInitialPanel, onUploadComicBook
   );
 };
 
-// Helper components for Tooltips to avoid clutter
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-
-const TooltipProviderWrapper: FC<{children: React.ReactNode}> = ({ children }) => (
-  <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
-);
 
 const TooltipWrapper: FC<{children: React.ReactNode, text: string}> = ({ children, text }) => (
   <Tooltip>

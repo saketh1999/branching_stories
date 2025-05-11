@@ -21,8 +21,8 @@ export default function Home() {
   const { 
     panels, 
     rootPanelId, 
-    isLoading: isStoryLoading, // This now reflects local storage loading
-    error: storyError,       // Reflects local storage errors or other client-side issues
+    isLoading: isStoryLoading, 
+    error: storyError,       
     addPanel, 
     addComicBook, 
     getPanel, 
@@ -175,13 +175,11 @@ export default function Home() {
 
 
   const renderContent = () => {
-    // isStoryLoading now refers to localStorage loading, which is usually fast.
-    // You might want to adjust this if localStorage interaction becomes slow or if you add other async setup.
     if (isStoryLoading || isProcessingFile) {
       return (
         <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center z-50 p-4">
-          <Loader2 className="h-10 w-10 sm:h-12 sm:w-12 animate-spin text-primary mb-3 sm:mb-4" />
-          <p className="text-md sm:text-lg text-foreground text-center">
+          <Loader2 className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 animate-spin text-primary mb-2 sm:mb-3 md:mb-4" />
+          <p className="text-sm sm:text-md md:text-lg text-foreground text-center">
             {isStoryLoading ? "Loading your story..." : "Processing your content..."}
           </p>
         </div>
@@ -191,30 +189,27 @@ export default function Home() {
     if (storyError) {
       return (
         <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center z-50 p-4 text-center">
-            <AlertTriangle className="h-10 w-10 sm:h-12 sm:w-12 text-destructive mb-3 sm:mb-4" />
-            <h2 className="text-lg sm:text-xl font-semibold text-destructive mb-2">Oops! Something went wrong.</h2>
-            <p className="text-sm sm:text-base text-muted-foreground mb-4">{storyError}</p>
-            <Button onClick={() => window.location.reload()} variant="destructive">Try Reloading</Button>
+            <AlertTriangle className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 text-destructive mb-2 sm:mb-3 md:mb-4" />
+            <h2 className="text-md sm:text-lg md:text-xl font-semibold text-destructive mb-1 sm:mb-2">Oops! Something went wrong.</h2>
+            <p className="text-xs sm:text-sm md:text-base text-muted-foreground mb-3 sm:mb-4">{storyError}</p>
+            <Button onClick={() => window.location.reload()} variant="destructive" size="sm" className="text-xs sm:text-sm">Try Reloading</Button>
         </div>
       );
     }
 
-    if (!rootPanelId && panels.length === 0) { // Check panels.length too for initial state
+    if (!rootPanelId && panels.length === 0) { 
       return (
-        <div className="flex items-center justify-center h-full p-4">
+        <div className="flex items-center justify-center h-full p-2 sm:p-4">
           <WelcomeMessage onUploadInitial={handleUploadInitialPanel} onUploadComicBook={handleUploadComicBook} />
         </div>
       );
     }
     
-    // Ensure rootId is valid before rendering FlowchartDisplay
     if (!rootPanelId && panels.length > 0) {
-      // This case might happen if storyInfo.rootPanelId is null but panels exist (e.g., corrupted local storage)
-      // Or, if the initial load is still determining the root
       return (
         <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center z-50 p-4">
-          <Loader2 className="h-10 w-10 sm:h-12 sm:w-12 animate-spin text-primary mb-3 sm:mb-4" />
-          <p className="text-md sm:text-lg text-foreground text-center">Initializing story map...</p>
+          <Loader2 className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 animate-spin text-primary mb-2 sm:mb-3 md:mb-4" />
+          <p className="text-sm sm:text-md md:text-lg text-foreground text-center">Initializing story map...</p>
         </div>
       );
     }
@@ -223,7 +218,7 @@ export default function Home() {
     return (
       <FlowchartDisplay
         panels={panels}
-        rootId={rootPanelId} // rootPanelId should be valid here
+        rootId={rootPanelId} 
         onGenerateNext={handleOpenGenerateDialog}
         onBranch={handleOpenGenerateDialog} 
         onUpdateTitle={handleUpdatePanelTitle}
