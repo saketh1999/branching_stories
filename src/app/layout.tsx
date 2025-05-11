@@ -4,6 +4,7 @@ import { GeistMono } from 'geist/font/mono';
 import './globals.css';
 import 'reactflow/dist/style.css'; // Import ReactFlow styles
 import { Toaster } from "@/components/ui/toaster";
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 const geistSans = GeistSans; // Direct usage as per new Geist package
 const geistMono = GeistMono;
@@ -21,7 +22,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body className="antialiased">
-        {children}
+        <ErrorBoundary>
+          {children}
+        </ErrorBoundary>
         <Toaster />
       </body>
     </html>

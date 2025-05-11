@@ -1,5 +1,4 @@
-
-import type { FC } from 'react';
+import type { FC, CSSProperties } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import type { ComicPanelData } from '@/types/story';
 import ComicPanelView from './ComicPanelView';
@@ -13,10 +12,16 @@ export interface ReactFlowNodeData {
   onUpdateTitle: (panelId: string, newTitle: string) => void;
   onRegenerateImage: (panelId: string, imageIndex: number, imageUrl: string, originalPrompt?: string) => void;
   onEditPanel: (panelId: string) => void;
+  onSelectPage?: (pageId: string) => void;
 }
 
-const ReactFlowNode: FC<NodeProps<ReactFlowNodeData>> = ({ data, isConnectable, selected, sourcePosition = Position.Bottom, targetPosition = Position.Top, style }) => {
-  const { panel, allPanels, onGenerateNext, onBranch, onUpdateTitle, onRegenerateImage, onEditPanel } = data;
+// Define an extended node props type that includes style
+interface ExtendedNodeProps extends NodeProps<ReactFlowNodeData> {
+  style?: CSSProperties;
+}
+
+const ReactFlowNode: FC<ExtendedNodeProps> = ({ data, isConnectable, selected, sourcePosition = Position.Bottom, targetPosition = Position.Top, style }) => {
+  const { panel, allPanels, onGenerateNext, onBranch, onUpdateTitle, onRegenerateImage, onEditPanel, onSelectPage } = data;
 
   const showDefaultHandles = !panel.isGroupNode && !panel.isComicBookPage;
   const showPageHandles = panel.isComicBookPage;
@@ -107,6 +112,7 @@ const ReactFlowNode: FC<NodeProps<ReactFlowNodeData>> = ({ data, isConnectable, 
         onUpdateTitle={onUpdateTitle} 
         onRegenerateImage={onRegenerateImage}
         onEditPanel={onEditPanel}
+        onSelectPage={onSelectPage}
       />
     </div>
   );

@@ -1,4 +1,3 @@
-
 import type { FC } from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import {
@@ -19,6 +18,8 @@ import { regenerateSingleImage } from '@/ai/flows/regenerate-single-image';
 import type { ComicPanelData } from '@/types/story';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
+import { Switch } from '@/components/ui/switch';
+import { ModelChoice } from '@/ai/flows/suggest-comic-panel-prompt';
 
 export interface RegenerateImageDetails {
   panelId: string;
@@ -36,6 +37,18 @@ interface RegenerateImageDialogProps {
   onImageRegenerated: (panelId: string, imageIndex: number, newImageUrl: string, newPromptText: string) => void;
 }
 
+/**
+ * Helper function to determine if a URL is an external image like Vercel Blob storage
+ */
+const isExternalImage = (url: string): boolean => {
+  return (
+    url.startsWith('https://') && 
+    (url.includes('blob.vercel-storage.com') || 
+     url.includes('amazonaws.com') || 
+     url.includes('cloudinary.com'))
+  );
+};
+
 const RegenerateImageDialog: FC<RegenerateImageDialogProps> = ({ 
   isOpen, 
   onClose, 
@@ -48,6 +61,7 @@ const RegenerateImageDialog: FC<RegenerateImageDialogProps> = ({
   const [contextImagePreviewUrl, setContextImagePreviewUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSetContextImageDialogOpen, setIsSetContextImageDialogOpen] = useState(false);
+  const [modelChoice, setModelChoice] = useState<ModelChoice>('gemini');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -85,6 +99,7 @@ const RegenerateImageDialog: FC<RegenerateImageDialogProps> = ({
       const result = await regenerateSingleImage({
         newPromptText: newPromptText.trim(),
         contextImageUrl: contextImageUrl,
+        modelChoice: modelChoice,
       });
       onImageRegenerated(imageDetails.panelId, imageDetails.imageIndex, result.generatedImageUrl, newPromptText.trim());
       toast({ title: "Image Regenerated!", description: "The image has been updated with your new prompt." });
@@ -103,6 +118,10 @@ const RegenerateImageDialog: FC<RegenerateImageDialogProps> = ({
 
   const handleClose = () => {
     onClose();
+  };
+
+  const toggleModel = () => {
+    setModelChoice(prev => prev === 'gemini' ? 'chatgpt' : 'gemini');
   };
 
   if (!imageDetails) return null;
@@ -135,7 +154,8 @@ const RegenerateImageDialog: FC<RegenerateImageDialogProps> = ({
                     objectFit="contain" 
                     data-ai-hint="original image thumbnail"
                     sizes="(max-width: 400px) 80vw, 200px"
-                    />
+                    unoptimized={isExternalImage(imageDetails.originalImageUrl)}
+                  />
                 </div>
               </div>
               <div className="w-full xs:w-1/2 space-y-1">
@@ -152,7 +172,8 @@ const RegenerateImageDialog: FC<RegenerateImageDialogProps> = ({
                         objectFit="contain" 
                         data-ai-hint="context image thumbnail"
                         sizes="(max-width: 400px) 80vw, 200px"
-                        />
+                        unoptimized={isExternalImage(contextImagePreviewUrl)}
+                      />
                   ): (
                     <div className="flex items-center justify-center h-full text-muted-foreground">
                         <ImageIcon className="w-6 h-6 sm:w-8 sm:h-8"/>
@@ -187,6 +208,22 @@ const RegenerateImageDialog: FC<RegenerateImageDialogProps> = ({
                   Original prompt: "{imageDetails.originalPrompt.substring(0, 40)}{imageDetails.originalPrompt.length > 40 ? '...' : ''}"
                 </p>
               )}
+            </div>
+
+            <div className="flex items-center justify-between space-x-2 pt-2">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="model-toggle"
+                  checked={modelChoice === 'chatgpt'}
+                  onCheckedChange={toggleModel}
+                />
+                <Label htmlFor="model-toggle" className="cursor-pointer">
+                  {modelChoice === 'gemini' ? 'Gemini' : 'ChatGPT/DALL-E'}
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {modelChoice === 'gemini' ? 'Uses Google Gemini for faster generation' : 'Uses OpenAI for higher quality (slower)'}
+              </p>
             </div>
           </div>
 

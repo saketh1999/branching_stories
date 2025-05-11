@@ -1,14 +1,16 @@
-
 "use client";
 
 import type { ComicPanelData, ComicStoryInfo } from '@/types/story';
 import { useState, useCallback, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from './use-toast';
+import { uploadImageToBlob } from '@/lib/blob-storage';
 
-const LOCAL_STORAGE_STORY_INFO_KEY = "comicStoryInfo_v2";
-const LOCAL_STORAGE_PANELS_KEY = "comicStoryPanels_v2";
+const LOCAL_STORAGE_STORY_INFO_KEY = "comicStoryInfo_v3";
+const LOCAL_STORAGE_PANELS_KEY = "comicStoryPanels_v3";
 const DEFAULT_STORY_TITLE = "My Branching Tale";
+const PREVIOUS_STORAGE_KEYS = ["comicStoryInfo_v2", "comicStoryPanels_v2", "comicStoryInfo_v1", "comicStoryPanels_v1"];
+const MIGRATION_COMPLETED_KEY = "blob_migration_completed_v3";
 
 interface AddPanelArgs {
   imageUrls: string[];
@@ -22,34 +24,184 @@ interface AddComicBookArgs {
   comicBookTitle: string;
 }
 
+/**
+ * Hook for managing comic story state with Vercel Blob storage
+ */
 export function useStoryState() {
   const [panels, setPanels] = useState<ComicPanelData[]>([]);
   const [storyInfo, setStoryInfo] = useState<ComicStoryInfo | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [isMigrating, setIsMigrating] = useState(false);
   const { toast } = useToast();
 
   const rootPanelId = storyInfo?.rootPanelId || null;
   const lastInitialPanelId = storyInfo?.lastInitialPanelId || null;
 
-  const saveStateToLocalStorage = useCallback((currentStoryInfo: ComicStoryInfo | null, currentPanels: ComicPanelData[]) => {
+  /**
+   * Check if a URL is a data URI that needs to be converted to a Blob URL
+   */
+  const isDataUri = useCallback((url: string): boolean => {
+    return url.startsWith('data:');
+  }, []);
+
+  /**
+   * Save state to localStorage, but ensure image URLs are Blob URLs to avoid quota issues
+   */
+  const saveStateToLocalStorage = useCallback(async (currentStoryInfo: ComicStoryInfo | null, currentPanels: ComicPanelData[]) => {
     try {
+      // Store the story info
       if (currentStoryInfo) {
         localStorage.setItem(LOCAL_STORAGE_STORY_INFO_KEY, JSON.stringify(currentStoryInfo));
       } else {
         localStorage.removeItem(LOCAL_STORAGE_STORY_INFO_KEY);
       }
-      localStorage.setItem(LOCAL_STORAGE_PANELS_KEY, JSON.stringify(currentPanels));
+      
+      // Process panels to ensure all images are stored as Blob URLs
+      const panelsForStorage = await Promise.all(currentPanels.map(async (panel) => {
+        // If the panel has image URLs that are data URIs, convert them to Blob URLs
+        if (panel.imageUrls.length > 0) {
+          const processedImageUrls = await Promise.all(panel.imageUrls.map(async (url, index) => {
+            if (isDataUri(url)) {
+              try {
+                // Only upload to Blob if it's a data URI
+                const sanitizedTitle = panel.title ? panel.title.slice(0, 20).replace(/[^a-z0-9]/gi, '_').toLowerCase() : '';
+                const blobUrl = await uploadImageToBlob(url, `panel_${panel.id}_img${index}_${sanitizedTitle}_${Date.now()}.png`);
+                return blobUrl;
+              } catch (error) {
+                console.error(`Failed to upload image to Blob storage for panel ${panel.id}:`, error);
+                // Fall back to the original URL if the upload fails
+                return url;
+              }
+            }
+            return url; // Return the URL unchanged if it's already a Blob URL
+          }));
+          
+          return {...panel, imageUrls: processedImageUrls};
+        }
+        return panel;
+      }));
+      
+      // Save the panels with Blob URLs to localStorage
+      localStorage.setItem(LOCAL_STORAGE_PANELS_KEY, JSON.stringify(panelsForStorage));
+      
+      // Important: Update the state with the processed panels WITHOUT triggering another save
+      // This prevents the recursive loop that's causing the maximum call stack error
+      setPanels(prevPanels => {
+        // Only update if there are actual changes to prevent unnecessary renders
+        if (JSON.stringify(prevPanels) !== JSON.stringify(panelsForStorage)) {
+          return panelsForStorage;
+        }
+        return prevPanels;
+      });
     } catch (e) {
       console.error("Error saving state to localStorage:", e);
-      toast({ title: "Local Storage Error", description: "Could not save story progress locally.", variant: "destructive" });
+      toast({ title: "Storage Error", description: "Could not save story progress. Using Vercel Blob as a fallback.", variant: "warning" });
     }
-  }, [toast]);
+  }, [toast, isDataUri]);
+
+  /**
+   * Migrate data from old localStorage versions to the new format with Blob URLs
+   */
+  const migrateOldData = useCallback(async () => {
+    // Check if migration already completed
+    if (localStorage.getItem(MIGRATION_COMPLETED_KEY) === 'true') {
+      return;
+    }
+
+    setIsMigrating(true);
+    toast({ title: "Migration in Progress", description: "Converting images to cloud storage. This may take a moment." });
+
+    try {
+      // Check for old versions of data
+      for (const storageInfoKey of PREVIOUS_STORAGE_KEYS) {
+        const oldPanelsKey = storageInfoKey.replace('Info', 'Panels');
+        const oldStoryInfoJson = localStorage.getItem(storageInfoKey);
+        const oldPanelsJson = localStorage.getItem(oldPanelsKey);
+
+        if (oldStoryInfoJson && oldPanelsJson) {
+          // Found old data, migrate it
+          const oldStoryInfo = JSON.parse(oldStoryInfoJson);
+          const oldPanels = JSON.parse(oldPanelsJson);
+
+          // Process panels to convert data URIs to Blob URLs
+          const migratedPanels = await Promise.all(oldPanels.map(async (panel: ComicPanelData) => {
+            if (panel.imageUrls && panel.imageUrls.length > 0) {
+              const processedUrls = await Promise.all(panel.imageUrls.map(async (url, index) => {
+                if (isDataUri(url)) {
+                  try {
+                    // Use a descriptive filename based on panel properties
+                    const sanitizedName = panel.title 
+                      ? panel.title.slice(0, 20).replace(/[^a-z0-9]/gi, '_').toLowerCase() 
+                      : `panel_${panel.id.substring(0, 8)}`;
+                    const blobUrl = await uploadImageToBlob(url, `migrated_${sanitizedName}_img${index}.png`);
+                    return blobUrl;
+                  } catch (err) {
+                    console.error("Failed to migrate image:", err);
+                    return url; // Keep the original URL on error
+                  }
+                }
+                return url; // Already a Blob URL or external URL
+              }));
+              return { ...panel, imageUrls: processedUrls };
+            }
+            return panel;
+          }));
+
+          // Update story info dates
+          const migratedStoryInfo = {
+            ...oldStoryInfo,
+            createdAt: new Date(oldStoryInfo.createdAt),
+            updatedAt: new Date()
+          };
+
+          // Save migrated data to new storage keys
+          localStorage.setItem(LOCAL_STORAGE_STORY_INFO_KEY, JSON.stringify(migratedStoryInfo));
+          localStorage.setItem(LOCAL_STORAGE_PANELS_KEY, JSON.stringify(migratedPanels));
+
+          // Update state
+          setStoryInfo(migratedStoryInfo);
+          setPanels(migratedPanels);
+
+          // Mark as migrated to avoid re-doing next time
+          localStorage.setItem(MIGRATION_COMPLETED_KEY, 'true');
+
+          // Show toast
+          toast({ title: "Migration Complete", description: "Your story has been migrated to cloud storage." });
+          
+          // We found and migrated data, so return
+          return;
+        }
+      }
+
+      // If we reached here, no old data was found - mark migration as complete anyway
+      localStorage.setItem(MIGRATION_COMPLETED_KEY, 'true');
+    } catch (error) {
+      console.error("Error during migration:", error);
+      toast({ 
+        title: "Migration Error", 
+        description: "Failed to migrate old data. Starting fresh.", 
+        variant: "destructive"
+      });
+    } finally {
+      setIsMigrating(false);
+    }
+  }, [toast, isDataUri]);
 
   const loadStory = useCallback(() => {
     setIsLoading(true);
     setError(null);
     try {
+      // First, check if we need to migrate old data
+      if (localStorage.getItem(MIGRATION_COMPLETED_KEY) !== 'true') {
+        // We'll handle migration separately and return early
+        migrateOldData().then(() => {
+          setIsLoading(false);
+        });
+        return;
+      }
+      
+      // Continue with normal loading if migration completed
       const storedStoryInfoJSON = localStorage.getItem(LOCAL_STORAGE_STORY_INFO_KEY);
       const storedPanelsJSON = localStorage.getItem(LOCAL_STORAGE_PANELS_KEY);
 
@@ -102,9 +254,11 @@ export function useStoryState() {
       setPanels([]);
       saveStateToLocalStorage(freshStoryInfo, []);
     } finally {
-      setIsLoading(false);
+      if (!isMigrating) {
+        setIsLoading(false);
+      }
     }
-  }, [toast, saveStateToLocalStorage]);
+  }, [toast, saveStateToLocalStorage, migrateOldData, isMigrating]);
 
   useEffect(() => {
     loadStory();
@@ -131,6 +285,15 @@ export function useStoryState() {
         throw new Error(msg);
       }
 
+      // Ensure all images are stored as Blob URLs first
+      const processedImageUrls = await Promise.all(imageUrls.map(async (url, index) => {
+        if (isDataUri(url)) {
+          const sanitizedPrompt = promptsUsed?.[index]?.slice(0, 20).replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'panel_image';
+          return await uploadImageToBlob(url, `panel_${sanitizedPrompt}_${Date.now()}.png`);
+        }
+        return url;
+      }));
+
       const newPanelId = uuidv4();
       let actualParentId: string | null = intendedParentId;
       let panelTitle = `Panel ${newPanelId.substring(0, 4)}`;
@@ -156,7 +319,7 @@ export function useStoryState() {
 
       const newPanel: ComicPanelData = {
         id: newPanelId,
-        imageUrls,
+        imageUrls: processedImageUrls,
         title: panelTitle,
         parentId: actualParentId,
         promptsUsed: promptsUsed,
@@ -191,7 +354,7 @@ export function useStoryState() {
       toast({ title: "Panel Added", description: `Panel "${panelTitle}" created.` });
       return newPanelId;
     },
-    [storyInfo, panels, toast, saveStateToLocalStorage]
+    [storyInfo, panels, toast, saveStateToLocalStorage, isDataUri]
   );
 
   const addComicBook = useCallback(
@@ -200,6 +363,14 @@ export function useStoryState() {
         toast({ title: "Comic Book Error", description: "Cannot create a comic book with no pages.", variant: "destructive" });
         throw new Error("Cannot create a comic book with no pages.");
       }
+
+      // Ensure all page images are stored as Blob URLs
+      const processedPageImageUrls = await Promise.all(pageImageUrls.map(async (url, index) => {
+        if (isDataUri(url)) {
+          return await uploadImageToBlob(url, `comic_book_page_${index + 1}_${Date.now()}.png`);
+        }
+        return url;
+      }));
 
       const comicBookGroupId = uuidv4();
       const actualComicBookTitle = comicBookTitle.trim() || `Comic Book ${comicBookGroupId.substring(0,4)}`;
@@ -211,8 +382,9 @@ export function useStoryState() {
 
       if (!newRootPanelId) { // This is the very first comic book uploaded
         newRootPanelId = comicBookGroupId;
-      } else { // Subsequent comic books link to the last "initial" panel/comic book
-        comicBookParentId = newLastInitialPanelId;
+      } else { 
+        // Modified: Always create standalone comic books without parent (no connection to previous)
+        comicBookParentId = null;
       }
       newLastInitialPanelId = comicBookGroupId; // This new comic book is now the last "initial" one
 
@@ -229,7 +401,7 @@ export function useStoryState() {
         createdAt: new Date(),
       };
 
-      const pagePanelsToAdd: ComicPanelData[] = pageImageUrls.map((imageUrl, index) => {
+      const pagePanelsToAdd: ComicPanelData[] = processedPageImageUrls.map((imageUrl, index) => {
         const pageId = uuidv4();
         comicBookGroupNode.childrenIds.push(pageId);
         return {
@@ -269,7 +441,7 @@ export function useStoryState() {
       toast({ title: "Comic Book Added", description: `"${actualComicBookTitle}" created.` });
       return comicBookGroupId;
     },
-    [storyInfo, panels, toast, saveStateToLocalStorage]
+    [storyInfo, panels, toast, saveStateToLocalStorage, isDataUri]
   );
 
   const updatePanelTitle = useCallback(async (panelId: string, newTitle: string) => {
@@ -307,7 +479,19 @@ export function useStoryState() {
       console.error(`Invalid imageIndex ${imageIndex} for panel ${panelId}`);
       return;
     }
-    updatedImageUrls[imageIndex] = newImageUrl;
+    
+    // Process the image URL if it's a data URI
+    let processedImageUrl = newImageUrl;
+    if (isDataUri(newImageUrl)) {
+      const sanitizedPrompt = newPromptText?.slice(0, 20).replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'updated_image';
+      try {
+        processedImageUrl = await uploadImageToBlob(newImageUrl, `panel_${panelId}_img${imageIndex}_${sanitizedPrompt}_${Date.now()}.png`);
+      } catch (error) {
+        console.error(`Failed to upload image to Blob storage for panel ${panelId}:`, error);
+        // Fall back to the original URL if upload fails
+      }
+    }
+    updatedImageUrls[imageIndex] = processedImageUrl;
 
     let updatedPromptsUsed = panel.promptsUsed ? [...panel.promptsUsed] : Array(updatedImageUrls.length).fill('');
     if (newPromptText !== undefined) {
@@ -324,7 +508,7 @@ export function useStoryState() {
 
     saveStateToLocalStorage(updatedStoryInfo, updatedPanels);
     toast({ title: "Image Updated", description: `Image ${imageIndex + 1} in panel updated.`});
-  }, [panels, storyInfo, toast, saveStateToLocalStorage]);
+  }, [panels, storyInfo, toast, saveStateToLocalStorage, isDataUri]);
 
   const updatePanelImages = useCallback(async (panelId: string, updates: Array<{ imageIndex: number; newImageUrl: string; newPromptText: string }>) => {
     const panelIdx = panels.findIndex(p => p.id === panelId);
@@ -335,12 +519,24 @@ export function useStoryState() {
     let updatedPromptsUsed = panel.promptsUsed ? [...panel.promptsUsed] : Array(panel.imageUrls.length).fill('');
     while(updatedPromptsUsed.length < panel.imageUrls.length) updatedPromptsUsed.push('');
 
-    updates.forEach(update => {
+    // Process each update
+    for (const update of updates) {
       if (update.imageIndex >= 0 && update.imageIndex < updatedImageUrls.length) {
-        updatedImageUrls[update.imageIndex] = update.newImageUrl;
+        // Process the image URL if it's a data URI
+        let processedImageUrl = update.newImageUrl;
+        if (isDataUri(update.newImageUrl)) {
+          const sanitizedPrompt = update.newPromptText?.slice(0, 20).replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'multi_update';
+          try {
+            processedImageUrl = await uploadImageToBlob(update.newImageUrl, `panel_${panelId}_img${update.imageIndex}_${sanitizedPrompt}_${Date.now()}.png`);
+          } catch (error) {
+            console.error(`Failed to upload image to Blob storage for panel ${panelId}:`, error);
+            // Fall back to the original URL if upload fails
+          }
+        }
+        updatedImageUrls[update.imageIndex] = processedImageUrl;
         if (update.imageIndex < updatedPromptsUsed.length) updatedPromptsUsed[update.imageIndex] = update.newPromptText;
       }
-    });
+    }
     
     const updatedPanels = [...panels];
     updatedPanels[panelIdx] = { ...panel, imageUrls: updatedImageUrls, promptsUsed: updatedPromptsUsed };
@@ -351,7 +547,7 @@ export function useStoryState() {
     
     saveStateToLocalStorage(updatedStoryInfo, updatedPanels);
     toast({ title: "Panel Images Updated", description: "Multiple images in the panel were updated." });
-  }, [panels, storyInfo, toast, saveStateToLocalStorage]);
+  }, [panels, storyInfo, toast, saveStateToLocalStorage, isDataUri]);
 
   const resetStory = useCallback(async () => {
     setIsLoading(true);

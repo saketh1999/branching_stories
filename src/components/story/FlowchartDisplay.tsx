@@ -1,6 +1,5 @@
-
 import type { FC } from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactFlow, {
   Controls,
   Background,
@@ -13,6 +12,7 @@ import ReactFlow, {
   type Edge,
   type Connection,
   ReactFlowProvider,
+  useReactFlow,
 } from 'reactflow';
 import type { ComicPanelData } from '@/types/story';
 import ReactFlowNode, { type ReactFlowNodeData } from './ReactFlowNode';
@@ -25,6 +25,7 @@ interface FlowchartDisplayProps {
   onUpdateTitle: (panelId: string, newTitle: string) => void;
   onRegenerateImage: (panelId: string, imageIndex: number, imageUrl: string, originalPrompt?: string) => void;
   onEditPanel: (panelId: string) => void;
+  onSelectPage?: (pageId: string) => void; // Optional callback when a page is selected
 }
 
 const nodeTypes = {
@@ -45,8 +46,9 @@ const calculateNodePositions = (
   const panel = panelMap.get(panelId);
   if (!panel || panel.isComicBookPage) return []; 
 
-  const BASE_HORIZONTAL_SPACING = 320; 
-  const BASE_VERTICAL_SPACING = 360;  
+  // Increase spacing between nodes to accommodate larger group nodes
+  const BASE_HORIZONTAL_SPACING = 400; // Increased from 320 
+  const BASE_VERTICAL_SPACING = 480;  // Increased from 360
 
   const HORIZONTAL_SPACING_SIBLING = panel.isGroupNode ? BASE_HORIZONTAL_SPACING * 1.25 : BASE_HORIZONTAL_SPACING; 
   const VERTICAL_SPACING_LEVEL = panel.isGroupNode ? BASE_VERTICAL_SPACING * 1.25 : BASE_VERTICAL_SPACING; 
@@ -76,33 +78,20 @@ const calculateNodePositions = (
   return positionsArray;
 };
 
+// Constants for group node sizing - Significantly increased dimensions
+const GROUP_NODE_BASE_WIDTH = 380;  // Was 280 - For xs screens
+const GROUP_NODE_SM_WIDTH = 480;    // Was 350 - For sm screens
+const GROUP_NODE_MD_WIDTH = 580;    // Was 420 - For md screens
+const GROUP_NODE_LG_WIDTH = 680;    // Was 500 - For lg+ screens
 
-const PAGE_NODE_BASE_WIDTH = 160; // for xs screens
-const PAGE_NODE_SM_WIDTH = 180; // for sm screens
-const PAGE_NODE_MD_WIDTH = 200; // for md+ screens
-
-const PAGE_NODE_BASE_HEIGHT = 240; // for xs screens
-const PAGE_NODE_SM_HEIGHT = 260; // for sm screens
-const PAGE_NODE_MD_HEIGHT = 280; // for md+ screens
-
-
-const PAGE_SPACING_XS = 8;
-const PAGE_SPACING_SM_MD = 10;
-
-const GROUP_NODE_CONTENT_PADDING_XS = 10;
-const GROUP_NODE_CONTENT_PADDING_SM_MD = 15;
-
-const PAGES_PER_ROW_XS = 1; 
-const PAGES_PER_ROW_SM = 2; 
-const PAGES_PER_ROW_MD_PLUS = 3; 
+const GROUP_NODE_BASE_HEIGHT = 380; // Was 280 - For xs screens
+const GROUP_NODE_SM_HEIGHT = 460;   // Was 340 - For sm screens
+const GROUP_NODE_MD_HEIGHT = 540;   // Was 400 - For md screens
+const GROUP_NODE_LG_HEIGHT = 620;   // Was 450 - For lg+ screens
 
 const SM_BREAKPOINT = 640;
-const MD_BREAKPOINT = 768; // Keep for reference, but LG might be more relevant for 3 columns
+const MD_BREAKPOINT = 768;
 const LG_BREAKPOINT = 1024;
-
-
-const GROUP_NODE_HEADER_ACTUAL_HEIGHT = 50; 
-const GROUP_NODE_FOOTER_ACTUAL_HEIGHT = 68; 
 
 const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
   panels,
@@ -112,40 +101,64 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
   onUpdateTitle,
   onRegenerateImage,
   onEditPanel,
+  onSelectPage,
 }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState<ReactFlowNodeData>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [pagesPerRow, setPagesPerRow] = useState(PAGES_PER_ROW_MD_PLUS);
-  const [pageNodeDimensions, setPageNodeDimensions] = useState({ width: PAGE_NODE_MD_WIDTH, height: PAGE_NODE_MD_HEIGHT });
-  const [pageSpacing, setPageSpacing] = useState(PAGE_SPACING_SM_MD);
-  const [groupNodePadding, setGroupNodePadding] = useState(GROUP_NODE_CONTENT_PADDING_SM_MD);
+  const [groupNodeSize, setGroupNodeSize] = useState({ width: GROUP_NODE_MD_WIDTH, height: GROUP_NODE_MD_HEIGHT });
+  
+  const reactFlowInstance = useReactFlow();
+  
+  // Handle page selection by finding the node and centering it
+  const handlePageSelect = useCallback((pageId: string) => {
+    // First call the external callback if provided
+    if (onSelectPage) {
+      onSelectPage(pageId);
+    }
+    
+    // Find the parent group node of this page
+    const page = panels.find(p => p.id === pageId);
+    if (page?.parentId) {
+      const parentNodeId = page.parentId;
+      const parentNode = reactFlowInstance.getNode(parentNodeId);
+      
+      if (parentNode) {
+        // Focus on the parent node (group node)
+        reactFlowInstance.setCenter(
+          parentNode.position.x, 
+          parentNode.position.y,
+          { zoom: 1, duration: 800 }
+        );
+        
+        // Highlight the parent node
+        const updatedNodes = nodes.map(node => ({
+          ...node,
+          selected: node.id === parentNodeId,
+        }));
+        
+        setNodes(updatedNodes);
+      }
+    }
+  }, [reactFlowInstance, nodes, setNodes, onSelectPage, panels]);
 
-
+  // Update group node size based on screen size
   useEffect(() => {
-    const updateLayoutParameters = () => {
+    const updateNodeSizes = () => {
       const width = window.innerWidth;
-      if (width < SM_BREAKPOINT) { // < 640px (Tailwind sm)
-        setPagesPerRow(PAGES_PER_ROW_XS);
-        setPageNodeDimensions({ width: PAGE_NODE_BASE_WIDTH, height: PAGE_NODE_BASE_HEIGHT });
-        setPageSpacing(PAGE_SPACING_XS);
-        setGroupNodePadding(GROUP_NODE_CONTENT_PADDING_XS);
-      } else if (width < LG_BREAKPOINT) { // 640px to < 1024px (Tailwind sm to lg)
-        setPagesPerRow(PAGES_PER_ROW_SM);
-        setPageNodeDimensions({ width: PAGE_NODE_SM_WIDTH, height: PAGE_NODE_SM_HEIGHT });
-        setPageSpacing(PAGE_SPACING_SM_MD);
-        setGroupNodePadding(GROUP_NODE_CONTENT_PADDING_SM_MD);
-      } else { // >= 1024px (Tailwind lg+)
-        setPagesPerRow(PAGES_PER_ROW_MD_PLUS);
-        setPageNodeDimensions({ width: PAGE_NODE_MD_WIDTH, height: PAGE_NODE_MD_HEIGHT });
-        setPageSpacing(PAGE_SPACING_SM_MD);
-        setGroupNodePadding(GROUP_NODE_CONTENT_PADDING_SM_MD);
+      if (width < SM_BREAKPOINT) {
+        setGroupNodeSize({ width: GROUP_NODE_BASE_WIDTH, height: GROUP_NODE_BASE_HEIGHT });
+      } else if (width < MD_BREAKPOINT) {
+        setGroupNodeSize({ width: GROUP_NODE_SM_WIDTH, height: GROUP_NODE_SM_HEIGHT });
+      } else if (width < LG_BREAKPOINT) {
+        setGroupNodeSize({ width: GROUP_NODE_MD_WIDTH, height: GROUP_NODE_MD_HEIGHT });
+      } else {
+        setGroupNodeSize({ width: GROUP_NODE_LG_WIDTH, height: GROUP_NODE_LG_HEIGHT });
       }
     };
-    updateLayoutParameters();
-    window.addEventListener('resize', updateLayoutParameters);
-    return () => window.removeEventListener('resize', updateLayoutParameters);
+    updateNodeSizes();
+    window.addEventListener('resize', updateNodeSizes);
+    return () => window.removeEventListener('resize', updateNodeSizes);
   }, []);
-
 
   useEffect(() => {
     const panelMap = new Map(panels.map(p => [p.id, p]));
@@ -159,82 +172,56 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
         const panel = panelMap.get(id)!;
 
         if (panel.isGroupNode) {
+          // Get all comic book page children for this group, but don't create nodes for them
           const pageChildren = panel.childrenIds
             .map(cid => panelMap.get(cid)!)
             .filter(p => p?.isComicBookPage)
             .sort((a, b) => (a.pageNumber || 0) - (b.pageNumber || 0));
           
-          const numRows = pageChildren.length > 0 ? Math.ceil(pageChildren.length / pagesPerRow) : 1;
-          const maxPagesInAnyRow = pageChildren.length > 0 ? Math.min(pageChildren.length, pagesPerRow) : 0;
-
-          const groupContentAreaWidth = (maxPagesInAnyRow * (pageNodeDimensions.width + pageSpacing)) - (maxPagesInAnyRow > 0 ? pageSpacing : 0);
-          const groupContentAreaHeight = (numRows * (pageNodeDimensions.height + pageSpacing)) - (numRows > 0 ? pageSpacing : 0);
-          
-          let baseGroupWidth;
-          let baseGroupHeight;
-          if (pagesPerRow === PAGES_PER_ROW_XS) {
-            baseGroupWidth = 260; // Slightly smaller for single column
-            baseGroupHeight = 160;
-          } else if (pagesPerRow === PAGES_PER_ROW_SM) {
-            baseGroupWidth = 300;
-            baseGroupHeight = 200;
-          } else { // PAGES_PER_ROW_MD_PLUS
-            baseGroupWidth = 320;
-            baseGroupHeight = 220;
-          }
-
-          const groupWidth = Math.max(baseGroupWidth, groupContentAreaWidth + groupNodePadding * 2); 
-          const groupHeight = Math.max(baseGroupHeight, 
-            GROUP_NODE_HEADER_ACTUAL_HEIGHT + 
-            (pageChildren.length > 0 ? groupContentAreaHeight : pageNodeDimensions.height / 2 ) + 
-            GROUP_NODE_FOOTER_ACTUAL_HEIGHT + 
-            (groupNodePadding * 2)
-          );
-
+          // Create only the group node, with all its pages as data
           newNodes.push({
             id: panel.id,
             type: 'comicPanelNode', 
-            data: { panel, allPanels: panels, onGenerateNext, onBranch, onUpdateTitle, onRegenerateImage, onEditPanel },
+            data: { 
+              panel, 
+              allPanels: panels, 
+              onGenerateNext, 
+              onBranch, 
+              onUpdateTitle, 
+              onRegenerateImage, 
+              onEditPanel, 
+              onSelectPage: handlePageSelect 
+            },
             position: position,
             draggable: true,
             style: { 
-              width: `${groupWidth}px`, 
-              height: `${groupHeight}px`, 
-              backgroundColor: 'hsl(var(--card))', 
-              border: '3px solid hsl(var(--primary))',
-              borderRadius: 'var(--radius)',
-              boxShadow: 'var(--shadow-lg)',
+              width: `${groupNodeSize.width}px`, 
+              height: `${groupNodeSize.height}px`, 
+              backgroundColor: 'transparent', 
+              border: 'none',
+              boxShadow: 'none',
             },
             zIndex: 0,
           });
-
-          pageChildren.forEach((pagePanel, index) => {
-            const rowIndex = Math.floor(index / pagesPerRow);
-            const colIndex = index % pagesPerRow;
-            newNodes.push({
-              id: pagePanel.id,
-              type: 'comicPanelNode',
-              data: { panel: pagePanel, allPanels: panels, onGenerateNext, onBranch, onUpdateTitle, onRegenerateImage, onEditPanel },
-              position: { 
-                x: groupNodePadding + colIndex * (pageNodeDimensions.width + pageSpacing), 
-                y: GROUP_NODE_HEADER_ACTUAL_HEIGHT + groupNodePadding + rowIndex * (pageNodeDimensions.height + pageSpacing)
-              },
-              parentNode: panel.id,
-              extent: 'parent',
-              draggable: true, 
-              zIndex: 1, 
-              style: { // Pass dimensions to ReactFlowNode for comic book pages
-                width: `${pageNodeDimensions.width}px`,
-                height: `${pageNodeDimensions.height}px`,
-              }
-            });
-          });
+          
+          // Note: We're no longer creating child nodes for pages
+          // The GroupNodeView component will handle displaying the pages internally
 
         } else if (!panel.isComicBookPage) { 
+          // Create nodes for regular panels (non-group, non-page)
           newNodes.push({
             id: panel.id,
             type: 'comicPanelNode',
-            data: { panel, allPanels: panels, onGenerateNext, onBranch, onUpdateTitle, onRegenerateImage, onEditPanel },
+            data: { 
+              panel, 
+              allPanels: panels, 
+              onGenerateNext, 
+              onBranch, 
+              onUpdateTitle, 
+              onRegenerateImage, 
+              onEditPanel, 
+              onSelectPage: handlePageSelect 
+            },
             position: position,
             draggable: true,
             style: {
@@ -245,53 +232,31 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
       });
 
       panels.forEach(panel => {
+        // Only create edges between non-page panels
         if (panel.parentId && panelMap.has(panel.parentId) && !panel.isComicBookPage) {
           const parentPanel = panelMap.get(panel.parentId)!;
           if (!parentPanel.isGroupNode || (parentPanel.isGroupNode && !panel.isComicBookPage)) {
-             if (newNodes.find(n => n.id === panel.parentId) && newNodes.find(n => n.id === panel.id)) {
-                 newEdges.push({
-                    id: `e-${panel.parentId}-${panel.id}`,
-                    source: panel.parentId,
-                    target: panel.id,
-                    markerEnd: { type: MarkerType.ArrowClosed, color: 'hsl(var(--primary))', width: 15, height: 15 }, 
-                    style: { stroke: 'hsl(var(--primary))', strokeWidth: 1.5 }, 
-                    animated: true,
-                    zIndex: 0,
-                });
+            if (newNodes.find(n => n.id === panel.parentId) && newNodes.find(n => n.id === panel.id)) {
+              newEdges.push({
+                id: `e-${panel.parentId}-${panel.id}`,
+                source: panel.parentId,
+                target: panel.id,
+                markerEnd: { type: MarkerType.ArrowClosed, color: 'hsl(var(--primary))', width: 15, height: 15 }, 
+                style: { stroke: 'hsl(var(--primary))', strokeWidth: 1.5 }, 
+                animated: true,
+                zIndex: 0,
+              });
             }
           }
         }
-        if (panel.isComicBookPage && panel.pageNumber && panel.parentId) {
-            const parentGroup = panelMap.get(panel.parentId);
-            if (parentGroup && parentGroup.isGroupNode) {
-                const siblings = parentGroup.childrenIds
-                    .map(id => panelMap.get(id)!)
-                    .filter(p => p?.isComicBookPage)
-                    .sort((a, b) => (a.pageNumber || 0) - (b.pageNumber || 0));
-                const currentIndex = siblings.findIndex(p => p.id === panel.id);
-
-                if (currentIndex !== -1 && currentIndex < siblings.length - 1) {
-                    const nextPageInGroup = siblings[currentIndex + 1];
-                     if (newNodes.find(n => n.id === panel.id) && newNodes.find(n => n.id === nextPageInGroup.id)) {
-                        newEdges.push({
-                            id: `e-page-${panel.id}-${nextPageInGroup.id}`,
-                            source: panel.id,
-                            target: nextPageInGroup.id,
-                            type: 'smoothstep', 
-                            markerEnd: { type: MarkerType.ArrowClosed, color: 'hsl(var(--secondary))', width:10, height:10 }, 
-                            style: { stroke: 'hsl(var(--secondary))', strokeWidth: 1 }, 
-                            zIndex: 0, 
-                        });
-                    }
-                }
-            }
-        }
+        
+        // We no longer need to create page-to-page edges since they're not in the flow anymore
       });
     }
     setNodes(newNodes);
     setEdges(newEdges);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panels, rootId, pagesPerRow, pageNodeDimensions, pageSpacing, groupNodePadding]); 
+  }, [panels, rootId, groupNodeSize]); 
 
   const onConnect = useCallback(
     (params: Connection | Edge) => setEdges((eds) => addEdge(params, eds)),
@@ -316,7 +281,7 @@ const FlowchartDisplayComponent: FC<FlowchartDisplayProps> = ({
         onConnect={onConnect}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.15, minZoom: 0.05, maxZoom: 1.2 }} // Adjusted padding & zoom
+        fitViewOptions={{ padding: 0.2, minZoom: 0.05, maxZoom: 1.2 }} // Increased padding for larger nodes
         minZoom={0.02} 
         maxZoom={1.5} 
         attributionPosition="bottom-left"

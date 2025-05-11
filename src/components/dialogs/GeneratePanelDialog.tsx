@@ -1,4 +1,3 @@
-
 import type { FC } from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import {
@@ -24,6 +23,8 @@ import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { v4 as uuidv4 } from 'uuid';
+import { Switch } from '@/components/ui/switch';
+import { ModelChoice } from '@/ai/flows/suggest-comic-panel-prompt';
 
 interface GeneratePanelDialogProps {
   isOpen: boolean;
@@ -44,11 +45,24 @@ interface PromptStateItem {
   sourceImageIndex?: number;
 }
 
+/**
+ * Helper function to determine if a URL is an external image (like Vercel Blob)
+ */
+const isExternalImage = (url: string): boolean => {
+  return (
+    url.startsWith('https://') && 
+    (url.includes('blob.vercel-storage.com') || 
+     url.includes('amazonaws.com') || 
+     url.includes('cloudinary.com'))
+  );
+};
+
 const GeneratePanelDialog: FC<GeneratePanelDialogProps> = ({ isOpen, onClose, parentPanel, allPanels, onPanelGenerated }) => {
   const [prompts, setPrompts] = useState<PromptStateItem[]>([]);
   const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([]);
   const [isSuggesting, setIsSuggesting] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [modelChoice, setModelChoice] = useState<ModelChoice>('gemini');
   const { toast } = useToast();
 
   const [isSetContextImageDialogOpen, setIsSetContextImageDialogOpen] = useState(false);
@@ -71,6 +85,10 @@ const GeneratePanelDialog: FC<GeneratePanelDialogProps> = ({ isOpen, onClose, pa
       setIsGenerating(false);
     }
   }, [isOpen, parentPanel]);
+
+  const toggleModel = () => {
+    setModelChoice(prev => prev === 'gemini' ? 'chatgpt' : 'gemini');
+  };
 
   const handlePromptTextChange = (index: number, value: string) => {
     const newPrompts = [...prompts];
@@ -132,6 +150,7 @@ const GeneratePanelDialog: FC<GeneratePanelDialogProps> = ({ isOpen, onClose, pa
       const result = await suggestComicPanelPrompts({ 
         currentPanelPrimaryImageUrl: suggestionContextImageUrl,
         currentPanelTextContext: textContext,
+        modelChoice: modelChoice,
       });
       setSuggestedPrompts(result.suggestedPrompts);
     } catch (error) {
@@ -191,7 +210,10 @@ const GeneratePanelDialog: FC<GeneratePanelDialogProps> = ({ isOpen, onClose, pa
 
     setIsGenerating(true);
     try {
-      const result = await generateComicPanel({ promptsWithContext: promptsForApi });
+      const result = await generateComicPanel({ 
+        promptsWithContext: promptsForApi,
+        modelChoice: modelChoice,
+      });
       onPanelGenerated(result.generatedImageUrls, promptsForApi.map(p => p.promptText));
       toast({ title: "Panel Images Generated!", description: `${result.generatedImageUrls.length} new image(s) added.` });
       handleClose();
@@ -255,9 +277,25 @@ const GeneratePanelDialog: FC<GeneratePanelDialogProps> = ({ isOpen, onClose, pa
                   <div className="text-xs text-muted-foreground">Context for Image {index+1}:</div>
                   <div className="flex flex-col xs:flex-row items-start xs:items-center gap-2">
                     {promptItem.customContextImagePreviewUrl ? (
-                       <Image src={promptItem.customContextImagePreviewUrl} alt={`Custom context for prompt ${index + 1}`} width={64} height={48} className="rounded object-contain border shrink-0" data-ai-hint="context preview small"/>
+                       <Image 
+                         src={promptItem.customContextImagePreviewUrl} 
+                         alt={`Custom context for prompt ${index + 1}`} 
+                         width={64} 
+                         height={48} 
+                         className="rounded object-contain border shrink-0" 
+                         data-ai-hint="context preview small"
+                         unoptimized={isExternalImage(promptItem.customContextImagePreviewUrl)}
+                       />
                     ) : defaultCtxImg ? (
-                       <Image src={defaultCtxImg} alt="Default parent panel context" width={64} height={48} className="rounded object-contain border shrink-0" data-ai-hint="parent context small"/>
+                       <Image 
+                         src={defaultCtxImg} 
+                         alt="Default parent panel context" 
+                         width={64} 
+                         height={48} 
+                         className="rounded object-contain border shrink-0" 
+                         data-ai-hint="parent context small"
+                         unoptimized={isExternalImage(defaultCtxImg)}
+                       />
                     ) : (
                       <div className="w-16 h-12 flex items-center justify-center bg-muted rounded border text-muted-foreground text-xs shrink-0">No Ctx</div>
                     )}
@@ -286,11 +324,32 @@ const GeneratePanelDialog: FC<GeneratePanelDialogProps> = ({ isOpen, onClose, pa
                 </div>
               ))}
               {prompts.length < MAX_PROMPTS && (
-                <Button onClick={addPromptField} variant="outline" size="sm" className="mt-1 justify-start text-xs sm:text-sm h-8 sm:h-9">
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Add Prompt (up to {MAX_PROMPTS})
+                <Button 
+                  variant="outline" 
+                  onClick={addPromptField} 
+                  size="sm"
+                  className="flex items-center justify-center p-4 border-2 border-dashed border-border hover:border-primary h-auto"
+                >
+                  <PlusCircle className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span className="text-xs sm:text-sm">Add Another Image Prompt</span>
                 </Button>
               )}
+              
+              <div className="flex justify-between items-center mt-2 p-2 sm:p-3 border border-border rounded-md bg-background/50">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="model-toggle"
+                    checked={modelChoice === 'chatgpt'}
+                    onCheckedChange={toggleModel}
+                  />
+                  <Label htmlFor="model-toggle" className="cursor-pointer text-sm">
+                    {modelChoice === 'gemini' ? 'Gemini' : 'ChatGPT/DALL-E'}
+                  </Label>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {modelChoice === 'gemini' ? 'Uses Google Gemini for faster generation' : 'Uses OpenAI for higher quality (slower)'}
+                </p>
+              </div>
             </div>
           </ScrollArea>
 

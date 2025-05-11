@@ -1,9 +1,8 @@
-
 "use client";
 
 import { useState, useCallback, useEffect } from 'react';
 import AppHeader from '@/components/layout/AppHeader';
-import WelcomeMessage from '@/components/WelcomeMessage';
+import HomePage from '@/components/HomePage';
 import FlowchartDisplay from '@/components/story/FlowchartDisplay';
 import UploadInitialPanelDialog from '@/components/dialogs/UploadInitialPanelDialog';
 import UploadComicBookDialog from '@/components/dialogs/UploadComicBookDialog';
@@ -17,7 +16,7 @@ import { Loader2, AlertTriangle } from 'lucide-react';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { Button } from '@/components/ui/button';
 
-export default function Home() {
+export default function Main() {
   const { 
     panels, 
     rootPanelId, 
@@ -38,6 +37,7 @@ export default function Home() {
   const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false);
   const [selectedPanelForGeneration, setSelectedPanelForGeneration] = useState<ComicPanelData | null>(null);
   const [isProcessingFile, setIsProcessingFile] = useState(false); 
+  const [showHomePage, setShowHomePage] = useState(true);
 
   const [isRegenerateImageDialogOpen, setIsRegenerateImageDialogOpen] = useState(false);
   const [selectedImageForRegeneration, setSelectedImageForRegeneration] = useState<RegenerateImageDetails | null>(null);
@@ -45,18 +45,35 @@ export default function Home() {
   const [isEditPanelDialogOpen, setIsEditPanelDialogOpen] = useState(false);
   const [panelForEditing, setPanelForEditing] = useState<ComicPanelData | null>(null);
 
+  // Check if we should show story editor
+  useEffect(() => {
+    if (rootPanelId || panels.length > 0) {
+      setShowHomePage(false);
+    }
+  }, [rootPanelId, panels.length]);
+
+  const navigateToHome = useCallback(() => {
+    setShowHomePage(true);
+  }, []);
+
+  const navigateToStoryEditor = useCallback(() => {
+    setShowHomePage(false);
+  }, []);
 
   const handleUploadInitialPanel = useCallback(() => {
     setIsUploadDialogOpen(true);
-  }, []);
+    navigateToStoryEditor();
+  }, [navigateToStoryEditor]);
 
   const handleUploadComicBook = useCallback(() => {
     setIsUploadComicBookDialogOpen(true);
-  }, []);
+    navigateToStoryEditor();
+  }, [navigateToStoryEditor]);
 
   const handleNewStory = useCallback(async () => {
-    await resetStory(); 
-  }, [resetStory]);
+    await resetStory();
+    navigateToHome();
+  }, [resetStory, navigateToHome]);
 
   const processUploadedFiles = (files: File[], description: string) => {
     if (files.length === 0) {
@@ -77,6 +94,7 @@ export default function Home() {
       .then(async imageUrls => {
         await addPanel({ imageUrls, parentId: null, userDescription: description });
         setIsUploadDialogOpen(false);
+        navigateToStoryEditor();
       })
       .catch(error => {
         console.error("Error reading files or adding panel:", error);
@@ -106,6 +124,7 @@ export default function Home() {
       .then(async pageImageUrls => {
         await addComicBook({ pageImageUrls, comicBookTitle: title });
         setIsUploadComicBookDialogOpen(false);
+        navigateToStoryEditor();
       })
       .catch(error => {
         console.error("Error reading comic book files or adding comic book:", error);
@@ -197,12 +216,8 @@ export default function Home() {
       );
     }
 
-    if (!rootPanelId && panels.length === 0) { 
-      return (
-        <div className="flex items-center justify-center h-full p-2 sm:p-4">
-          <WelcomeMessage onUploadInitial={handleUploadInitialPanel} onUploadComicBook={handleUploadComicBook} />
-        </div>
-      );
+    if (showHomePage) { 
+      return <HomePage onUploadInitial={handleUploadInitialPanel} onUploadComicBook={handleUploadComicBook} />;
     }
     
     if (!rootPanelId && panels.length > 0) {
@@ -236,7 +251,8 @@ export default function Home() {
           onUploadInitialPanel={handleUploadInitialPanel}
           onUploadComicBook={handleUploadComicBook}
           onNewStory={handleNewStory}
-          hasStory={!!rootPanelId || panels.length > 0} 
+          hasStory={!!rootPanelId || panels.length > 0}
+          onNavigateHome={navigateToHome}
         />
         <main className="flex-1 overflow-hidden relative">
           {renderContent()}
