@@ -1,14 +1,13 @@
 import type { FC } from 'react';
 import { Button } from '@/components/ui/button';
-import { FileUp, BookOpenCheck, Zap, ChevronRight, ImagePlus, Sparkles } from 'lucide-react';
+import { FileUp, Zap, ChevronRight, ImagePlus, Sparkles } from 'lucide-react';
 import Image from 'next/image';
 
 interface HomePageProps {
   onUploadInitial: () => void;
-  onUploadComicBook: () => void;
 }
 
-const HomePage: FC<HomePageProps> = ({ onUploadInitial, onUploadComicBook }) => {
+const HomePage: FC<HomePageProps> = ({ onUploadInitial }) => {
   return (
     <div className="flex flex-col min-h-full bg-background text-foreground">
       {/* Hero Section */}
@@ -30,10 +29,6 @@ const HomePage: FC<HomePageProps> = ({ onUploadInitial, onUploadComicBook }) => 
               <Button size="lg" className="w-full sm:w-auto text-sm sm:text-base" onClick={onUploadInitial}>
                 <FileUp className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
                 Upload First Panel
-              </Button>
-              <Button size="lg" variant="secondary" className="w-full sm:w-auto text-sm sm:text-base" onClick={onUploadComicBook}>
-                <BookOpenCheck className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-                Upload Comic Book
               </Button>
             </div>
             <p className="text-xs sm:text-sm text-muted-foreground flex items-center justify-center md:justify-start">
@@ -107,7 +102,7 @@ const HomePage: FC<HomePageProps> = ({ onUploadInitial, onUploadComicBook }) => 
           </div>
           
           <div className="text-center mt-8 sm:mt-12">
-            <Button size="lg" className="group" onClick={onUploadComicBook}>
+            <Button size="lg" className="group" onClick={onUploadInitial}>
               Get Started Now
               <ChevronRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Button>

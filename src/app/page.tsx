@@ -6,7 +6,6 @@ import HomePage from '@/components/HomePage';
 import FlowchartDisplay from '@/components/story/FlowchartDisplay';
 import StorySelector from '@/components/story/StorySelector';
 import UploadInitialPanelDialog from '@/components/dialogs/UploadInitialPanelDialog';
-import UploadComicBookDialog from '@/components/dialogs/UploadComicBookDialog';
 import GeneratePanelDialog from '@/components/dialogs/GeneratePanelDialog';
 import RegenerateImageDialog, { type RegenerateImageDetails } from '@/components/dialogs/RegenerateImageDialog';
 import EditPanelDialog from '@/components/dialogs/EditPanelDialog';
@@ -36,7 +35,6 @@ export default function Main() {
   const { toast } = useToast();
 
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
-  const [isUploadComicBookDialogOpen, setIsUploadComicBookDialogOpen] = useState(false);
   const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false);
   const [selectedPanelForGeneration, setSelectedPanelForGeneration] = useState<ComicPanelData | null>(null);
   const [isProcessingFile, setIsProcessingFile] = useState(false); 
@@ -67,11 +65,6 @@ export default function Main() {
 
   const handleUploadInitialPanel = useCallback(() => {
     setIsUploadDialogOpen(true);
-    navigateToStoryEditor();
-  }, [navigateToStoryEditor]);
-
-  const handleUploadComicBook = useCallback(() => {
-    setIsUploadComicBookDialogOpen(true);
     navigateToStoryEditor();
   }, [navigateToStoryEditor]);
 
@@ -122,74 +115,6 @@ export default function Main() {
     updateActiveStoryPanels(updatedPanels);
     return newPanelId;
   }, [panels, updateActiveStoryPanels]);
-
-  const addComicBook = useCallback(({ pageImageUrls, comicBookTitle }: {
-    pageImageUrls: string[];
-    comicBookTitle: string;
-  }) => {
-    if (pageImageUrls.length === 0) {
-      toast({ title: "Comic Book Error", description: "Cannot create a comic book with no pages.", variant: "destructive" });
-      throw new Error("Cannot create a comic book with no pages.");
-    }
-
-    const comicBookGroupId = uuidv4();
-    const actualComicBookTitle = comicBookTitle.trim() || `Comic Book ${comicBookGroupId.substring(0,4)}`;
-    
-    let comicBookParentId: string | null = null;
-    let newRootPanelId = activeStory?.rootPanelId || null;
-    let newLastInitialPanelId = activeStory?.lastInitialPanelId || null;
-
-    if (!newRootPanelId) { // This is the very first comic book uploaded
-      newRootPanelId = comicBookGroupId;
-    } else { 
-      // Always create standalone comic books without parent (no connection to previous)
-      comicBookParentId = null;
-    }
-    newLastInitialPanelId = comicBookGroupId; // This new comic book is now the last "initial" one
-
-    const comicBookGroupNode: ComicPanelData = {
-      id: comicBookGroupId,
-      imageUrls: [],
-      title: actualComicBookTitle,
-      userDescription: `Comic Book: ${actualComicBookTitle}`,
-      parentId: comicBookParentId,
-      childrenIds: [],
-      isGroupNode: true,
-      isComicBookPage: false,
-      createdAt: new Date(),
-    };
-
-    const pagePanelsToAdd: ComicPanelData[] = pageImageUrls.map((imageUrl, index) => {
-      const pageId = uuidv4();
-      comicBookGroupNode.childrenIds.push(pageId);
-      return {
-        id: pageId,
-        imageUrls: [imageUrl],
-        title: `Page ${index + 1}`,
-        parentId: comicBookGroupId,
-        childrenIds: [],
-        isGroupNode: false,
-        isComicBookPage: true,
-        pageNumber: index + 1,
-        createdAt: new Date(),
-      };
-    });
-    
-    let updatedPanels = [...panels, comicBookGroupNode, ...pagePanelsToAdd];
-    if (comicBookParentId) {
-      const parentIndex = updatedPanels.findIndex(p => p.id === comicBookParentId);
-      if (parentIndex > -1) {
-        updatedPanels[parentIndex] = {
-          ...updatedPanels[parentIndex],
-          childrenIds: [...updatedPanels[parentIndex].childrenIds, comicBookGroupId],
-        };
-      }
-    }
-    
-    updateActiveStoryPanels(updatedPanels);
-    toast({ title: "Comic Book Added", description: `"${actualComicBookTitle}" created.` });
-    return comicBookGroupId;
-  }, [activeStory, panels, toast, updateActiveStoryPanels]);
 
   const updatePanelTitle = useCallback((panelId: string, newTitle: string) => {
     const updatedPanels = panels.map(panel => {
@@ -312,36 +237,6 @@ export default function Main() {
         setIsProcessingFile(false);
       });
   };
-  
-  const processUploadedComicBook = (files: File[], title: string) => {
-    if (files.length === 0) {
-      toast({ title: "No Pages", description: "Please select at least one image file for your comic book.", variant: "destructive" });
-      return;
-    }
-    setIsProcessingFile(true);
-    const fileReadPromises = files.map(file => {
-      return new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-    });
-
-    Promise.all(fileReadPromises)
-      .then(async pageImageUrls => {
-        await addComicBook({ pageImageUrls, comicBookTitle: title });
-        setIsUploadComicBookDialogOpen(false);
-        navigateToStoryEditor();
-      })
-      .catch(error => {
-        console.error("Error reading comic book files or adding comic book:", error);
-        toast({ title: "File Error", description: "Could not read files or create comic book.", variant: "destructive" });
-      })
-      .finally(() => {
-        setIsProcessingFile(false);
-      });
-  };
 
   const handleOpenGenerateDialog = useCallback((panelId: string) => {
     const panel = getPanel(panelId);
@@ -423,7 +318,7 @@ export default function Main() {
     }
 
     if (showHomePage) { 
-      return <HomePage onUploadInitial={handleUploadInitialPanel} onUploadComicBook={handleUploadComicBook} />;
+      return <HomePage onUploadInitial={handleUploadInitialPanel} />;
     }
     
     if (!rootPanelId && panels.length > 0) {
@@ -453,7 +348,7 @@ export default function Main() {
       <div className="flex flex-col min-h-screen bg-background text-foreground antialiased">
         <AppHeader 
           onUploadInitialPanel={handleUploadInitialPanel}
-          onUploadComicBook={handleUploadComicBook}
+          onUploadComicBook={() => {}} // Provide empty function to satisfy interface
           onNewStory={resetStory}
           hasStory={!!rootPanelId || panels.length > 0}
           onNavigateHome={navigateToHome}
@@ -476,12 +371,6 @@ export default function Main() {
           isOpen={isUploadDialogOpen}
           onClose={() => setIsUploadDialogOpen(false)}
           onUpload={processUploadedFiles}
-        />
-
-        <UploadComicBookDialog
-          isOpen={isUploadComicBookDialogOpen}
-          onClose={() => setIsUploadComicBookDialogOpen(false)}
-          onUpload={processUploadedComicBook}
         />
         
         {selectedPanelForGeneration && (

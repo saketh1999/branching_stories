@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { Loader2 } from 'lucide-react';
 import type { ComicPanelData } from '@/types/story';
+import VideoCarousel from '@/components/VideoCarousel';
 
 // Dynamic import with no SSR
 const FlowchartDisplay = dynamic(
@@ -28,5 +29,10 @@ interface DynamicFlowchartProps {
 }
 
 export default function DynamicFlowchart(props: DynamicFlowchartProps) {
-  return <FlowchartDisplay {...props} />;
+  return (
+    <div className="relative h-full w-full">
+      <VideoCarousel />
+      <FlowchartDisplay {...props} />
+    </div>
+  );
 } 
