@@ -1,11 +1,10 @@
 import type { FC, KeyboardEvent } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { FileImage, GitFork, Edit2, Edit3, RefreshCcw } from 'lucide-react';
-import Image from 'next/image';
+import { FileImage, GitFork, Edit2, Edit3 } from 'lucide-react';
 import type { ComicPanelData } from '@/types/story';
 import { cn } from '@/lib/utils';
 
-import { TooltipButton, ActionButtonProps, isExternalImage } from './utils';
+import { TooltipButton, ActionButtonProps, AnimatedImageDisplay } from './utils';
 import { PanelHeaderStandard, PanelActionsFooter } from './layout';
 
 interface ComicBookPageViewProps {
@@ -75,24 +74,19 @@ const ComicBookPageView: FC<ComicBookPageViewProps> = ({
           }
         />
       </CardHeader>
-      <CardContent 
-        className="p-0 aspect-[2/3] relative bg-muted flex-grow group cursor-pointer" 
-        onClick={() => onRegenerateImage(panel.id, 0, panel.imageUrls[0], panel.promptsUsed?.[0])} 
-        title="Click to regenerate this page"
-      >
-        <Image
-          src={panel.imageUrls[0]}
-          alt={panel.promptsUsed?.[0] || displayTitle}
-          layout="fill"
-          objectFit="contain"
-          data-ai-hint="comic page"
-          className="transition-transform duration-300 ease-in-out group-hover:scale-105"
-          sizes="(max-width: 639px) 160px, (max-width: 1023px) 180px, 200px"
-          unoptimized={isExternalImage(panel.imageUrls[0])}
-        />
-        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-          <RefreshCcw className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
-        </div>
+      <CardContent className="p-0 aspect-[2/3] relative bg-muted flex-grow">
+        {panel.imageUrls.length > 0 ? (
+          <AnimatedImageDisplay
+            url={panel.imageUrls[0]}
+            alt={panel.promptsUsed?.[0] || displayTitle}
+            onClick={() => onRegenerateImage(panel.id, 0, panel.imageUrls[0], panel.promptsUsed?.[0])}
+            prompt={panel.promptsUsed?.[0] || panel.userDescription}
+          />
+        ) : (
+          <div className="flex items-center justify-center h-full text-muted-foreground p-2 text-xs sm:text-sm">
+            No image for this page.
+          </div>
+        )}
       </CardContent>
       <PanelActionsFooter actions={footerActions} className="grid-cols-2 p-1" />
     </Card>

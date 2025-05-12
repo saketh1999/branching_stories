@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * ComicPanelView Component
  * * This component handles the display of comic panels in the story editor.

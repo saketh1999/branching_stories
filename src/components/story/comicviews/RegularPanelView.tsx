@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import type { ComicPanelData } from '@/types/story';
 import { cn } from '@/lib/utils';
 
-import { TooltipButton, ActionButtonProps, ImageDisplay } from './utils';
+import { TooltipButton, ActionButtonProps, AnimatedImageDisplay } from './utils';
 import { PanelHeaderStandard, PanelActionsFooter } from './layout';
 
 interface RegularPanelViewProps {
@@ -115,12 +115,13 @@ const RegularPanelView: FC<RegularPanelViewProps> = ({
         hasMultipleImages && isExpanded && "flex flex-col gap-px" 
       )}>
         {panel.imageUrls.map((url, index) => (
-          <ImageDisplay
+          <AnimatedImageDisplay
             key={index}
             url={url}
             alt={panel.promptsUsed?.[index] || panel.userDescription || `Comic panel image ${index + 1}`}
             onClick={() => onRegenerateImage(panel.id, index, url, panel.promptsUsed?.[index])}
             isExpanded={isExpanded}
+            prompt={panel.promptsUsed?.[index] || panel.userDescription}
           />
         ))}
         {!hasMultipleImages && panel.imageUrls.length === 0 && (
