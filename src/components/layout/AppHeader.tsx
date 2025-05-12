@@ -1,10 +1,15 @@
 import type { FC, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
-import { BookImage, PlusSquare, Trash2, BookOpenCheck, Home } from 'lucide-react';
+import { BookImage, PlusSquare, Trash2, BookOpenCheck, Home, Video } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle'; 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
+import { VideoGalleryState } from '../BlobVideoGallery';
+
+// Dynamically import the BlobVideoGalleryWrapper component with no SSR
+const BlobVideoGalleryWrapper = dynamic(() => import('../BlobVideoGalleryWrapper'), { ssr: false });
 
 interface AppHeaderProps {
   onUploadInitialPanel: () => void;
@@ -25,6 +30,10 @@ const AppHeader: FC<AppHeaderProps> = ({
 }) => {
   const router = useRouter();
 
+  const toggleVideoGallery = () => {
+    VideoGalleryState.toggle();
+  };
+
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 sm:h-16 max-w-full items-center justify-between px-2 sm:px-4 md:px-6 lg:px-8">
@@ -44,6 +53,26 @@ const AppHeader: FC<AppHeaderProps> = ({
               {storySelector}
             </div>
           )}
+
+          {/* Videos button */}
+          <div className="ml-2 sm:ml-4">
+            <TooltipProvider delayDuration={200}>
+              <TooltipWrapper text="Available Videos">
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  className="h-8 w-8 sm:h-9 sm:w-auto sm:px-2 md:px-3"
+                  onClick={toggleVideoGallery}
+                >
+                  <Video className="h-4 w-4" />
+                  <span className="hidden sm:inline ml-1.5 sm:ml-2 text-xs sm:text-sm">Videos</span>
+                </Button>
+              </TooltipWrapper>
+            </TooltipProvider>
+          </div>
+          
+          {/* Video gallery component that will be shown/hidden with its own toggle */}
+          <BlobVideoGalleryWrapper />
         </div>
         <div className="flex items-center gap-1 xs:gap-2 sm:gap-2.5 md:gap-3">
           <TooltipProvider delayDuration={200}>
