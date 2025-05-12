@@ -145,4 +145,33 @@ export async function listImagesFromBlob(prefix?: string) {
     console.error('Error listing images from Vercel Blob:', error);
     throw new Error(`Failed to list images: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+/**
+ * Uploads an image (data URI or file) to Vercel Blob storage
+ */
+export async function uploadToVercelBlob(imageData: string, filename: string): Promise<string> {
+  try {
+    // Convert data URI to blob
+    const res = await fetch(imageData);
+    const blob = await res.blob();
+    
+    // Upload to Vercel Blob
+    const { url } = await put(filename, blob, {
+      access: 'public',
+      handleUploadUrl: '/api/blob-upload', // API route to handle uploads
+    });
+    
+    return url;
+  } catch (error) {
+    console.error("Error uploading to Vercel Blob:", error);
+    // For development fallback, create an Object URL
+    try {
+      const res = await fetch(imageData);
+      const blob = await res.blob();
+      return URL.createObjectURL(blob);
+    } catch {
+      return imageData; // Return original if all else fails
+    }
+  }
 } 

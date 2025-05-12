@@ -1,4 +1,3 @@
-
 export interface ComicPanelData {
   id: string;
   imageUrls: string[]; // Array of 1 to 4 image data URIs
@@ -21,4 +20,18 @@ export interface ComicStoryInfo {
   updatedAt: Date; // Changed for local state management
   rootPanelId: string | null;
   lastInitialPanelId: string | null;
+}
+
+// Collection of all stories with an active story ID
+export interface StoriesCollection {
+  stories: ComicStoryInfo[];
+  activeStoryId: string | null;
+}
+
+// ReactFlow specific data for a story
+export interface ReactFlowData {
+  storyId: string;
+  panels: ComicPanelData[];
+  createdAt: Date;
+  updatedAt: Date;
 }

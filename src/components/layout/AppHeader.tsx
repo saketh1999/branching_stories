@@ -1,4 +1,4 @@
-import type { FC } from 'react';
+import type { FC, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { BookImage, PlusSquare, Trash2, BookOpenCheck, Home } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle'; 
@@ -12,6 +12,7 @@ interface AppHeaderProps {
   onNewStory: () => void;
   hasStory: boolean;
   onNavigateHome: () => void;
+  storySelector?: ReactNode;
 }
 
 const AppHeader: FC<AppHeaderProps> = ({ 
@@ -19,7 +20,8 @@ const AppHeader: FC<AppHeaderProps> = ({
   onUploadComicBook, 
   onNewStory, 
   hasStory, 
-  onNavigateHome 
+  onNavigateHome,
+  storySelector
 }) => {
   const router = useRouter();
 
@@ -37,6 +39,11 @@ const AppHeader: FC<AppHeaderProps> = ({
           >
             Branching Tales
           </h1>
+          {storySelector && (
+            <div className="ml-4">
+              {storySelector}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-1 xs:gap-2 sm:gap-2.5 md:gap-3">
           <TooltipProvider delayDuration={200}>
@@ -71,7 +78,6 @@ const AppHeader: FC<AppHeaderProps> = ({
     </header>
   );
 };
-
 
 const TooltipWrapper: FC<{children: React.ReactNode, text: string}> = ({ children, text }) => (
   <Tooltip>

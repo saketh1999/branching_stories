@@ -4,32 +4,35 @@ import { useState, useCallback, useEffect } from 'react';
 import AppHeader from '@/components/layout/AppHeader';
 import HomePage from '@/components/HomePage';
 import FlowchartDisplay from '@/components/story/FlowchartDisplay';
+import StorySelector from '@/components/story/StorySelector';
 import UploadInitialPanelDialog from '@/components/dialogs/UploadInitialPanelDialog';
 import UploadComicBookDialog from '@/components/dialogs/UploadComicBookDialog';
 import GeneratePanelDialog from '@/components/dialogs/GeneratePanelDialog';
 import RegenerateImageDialog, { type RegenerateImageDetails } from '@/components/dialogs/RegenerateImageDialog';
 import EditPanelDialog from '@/components/dialogs/EditPanelDialog';
-import { useStoryState } from '@/hooks/useStoryState';
+import { useStoriesCollection } from '@/hooks/useStoriesCollection';
 import type { ComicPanelData } from '@/types/story';
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { Button } from '@/components/ui/button';
+import { v4 as uuidv4 } from 'uuid';
+import ClientFlowchartDisplay from '@/components/story/ClientFlowchartDisplay';
+import DynamicFlowchart from '@/components/story/DynamicFlowchart';
 
 export default function Main() {
   const { 
-    panels, 
-    rootPanelId, 
+    storiesCollection,
+    activeStory,
+    activeStoryPanels: panels,
     isLoading: isStoryLoading, 
     error: storyError,       
-    addPanel, 
-    addComicBook, 
-    getPanel, 
-    resetStory, 
-    updatePanelTitle, 
-    updatePanelImage, 
-    updatePanelImages 
-  } = useStoryState();
+    createNewStory,
+    switchStory,
+    deleteStory,
+    updateStoryTitle,
+    updateActiveStoryPanels
+  } = useStoriesCollection();
   const { toast } = useToast();
 
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
@@ -44,6 +47,8 @@ export default function Main() {
 
   const [isEditPanelDialogOpen, setIsEditPanelDialogOpen] = useState(false);
   const [panelForEditing, setPanelForEditing] = useState<ComicPanelData | null>(null);
+
+  const rootPanelId = activeStory?.rootPanelId || null;
 
   // Check if we should show story editor
   useEffect(() => {
@@ -70,10 +75,213 @@ export default function Main() {
     navigateToStoryEditor();
   }, [navigateToStoryEditor]);
 
-  const handleNewStory = useCallback(async () => {
-    await resetStory();
+  const resetStory = useCallback(async () => {
+    // Create a new empty story
+    await createNewStory("New Story");
     navigateToHome();
-  }, [resetStory, navigateToHome]);
+  }, [createNewStory, navigateToHome]);
+
+  const getPanel = useCallback((panelId: string) => {
+    return panels.find(p => p.id === panelId) || null;
+  }, [panels]);
+
+  const addPanel = useCallback(({ imageUrls, parentId, promptsUsed, userDescription }: {
+    imageUrls: string[];
+    parentId: string | null;
+    promptsUsed?: string[];
+    userDescription?: string;
+  }) => {
+    const newPanelId = uuidv4();
+    const now = new Date();
+    
+    const newPanel: ComicPanelData = {
+      id: newPanelId,
+      imageUrls,
+      promptsUsed,
+      userDescription,
+      parentId,
+      childrenIds: [],
+      createdAt: now
+    };
+    
+    let updatedPanels = [...panels, newPanel];
+    
+    // If this panel has a parent, update the parent's childrenIds
+    if (parentId) {
+      updatedPanels = updatedPanels.map(panel => {
+        if (panel.id === parentId) {
+          return {
+            ...panel,
+            childrenIds: [...panel.childrenIds, newPanelId]
+          };
+        }
+        return panel;
+      });
+    }
+    
+    updateActiveStoryPanels(updatedPanels);
+    return newPanelId;
+  }, [panels, updateActiveStoryPanels]);
+
+  const addComicBook = useCallback(({ pageImageUrls, comicBookTitle }: {
+    pageImageUrls: string[];
+    comicBookTitle: string;
+  }) => {
+    if (pageImageUrls.length === 0) {
+      toast({ title: "Comic Book Error", description: "Cannot create a comic book with no pages.", variant: "destructive" });
+      throw new Error("Cannot create a comic book with no pages.");
+    }
+
+    const comicBookGroupId = uuidv4();
+    const actualComicBookTitle = comicBookTitle.trim() || `Comic Book ${comicBookGroupId.substring(0,4)}`;
+    
+    let comicBookParentId: string | null = null;
+    let newRootPanelId = activeStory?.rootPanelId || null;
+    let newLastInitialPanelId = activeStory?.lastInitialPanelId || null;
+
+    if (!newRootPanelId) { // This is the very first comic book uploaded
+      newRootPanelId = comicBookGroupId;
+    } else { 
+      // Always create standalone comic books without parent (no connection to previous)
+      comicBookParentId = null;
+    }
+    newLastInitialPanelId = comicBookGroupId; // This new comic book is now the last "initial" one
+
+    const comicBookGroupNode: ComicPanelData = {
+      id: comicBookGroupId,
+      imageUrls: [],
+      title: actualComicBookTitle,
+      userDescription: `Comic Book: ${actualComicBookTitle}`,
+      parentId: comicBookParentId,
+      childrenIds: [],
+      isGroupNode: true,
+      isComicBookPage: false,
+      createdAt: new Date(),
+    };
+
+    const pagePanelsToAdd: ComicPanelData[] = pageImageUrls.map((imageUrl, index) => {
+      const pageId = uuidv4();
+      comicBookGroupNode.childrenIds.push(pageId);
+      return {
+        id: pageId,
+        imageUrls: [imageUrl],
+        title: `Page ${index + 1}`,
+        parentId: comicBookGroupId,
+        childrenIds: [],
+        isGroupNode: false,
+        isComicBookPage: true,
+        pageNumber: index + 1,
+        createdAt: new Date(),
+      };
+    });
+    
+    let updatedPanels = [...panels, comicBookGroupNode, ...pagePanelsToAdd];
+    if (comicBookParentId) {
+      const parentIndex = updatedPanels.findIndex(p => p.id === comicBookParentId);
+      if (parentIndex > -1) {
+        updatedPanels[parentIndex] = {
+          ...updatedPanels[parentIndex],
+          childrenIds: [...updatedPanels[parentIndex].childrenIds, comicBookGroupId],
+        };
+      }
+    }
+    
+    updateActiveStoryPanels(updatedPanels);
+    toast({ title: "Comic Book Added", description: `"${actualComicBookTitle}" created.` });
+    return comicBookGroupId;
+  }, [activeStory, panels, toast, updateActiveStoryPanels]);
+
+  const updatePanelTitle = useCallback((panelId: string, newTitle: string) => {
+    const updatedPanels = panels.map(panel => {
+      if (panel.id === panelId) {
+        return { ...panel, title: newTitle };
+      }
+      return panel;
+    });
+    
+    updateActiveStoryPanels(updatedPanels);
+    toast({ title: "Title Updated", description: "Panel title has been updated." });
+  }, [panels, toast, updateActiveStoryPanels]);
+
+  const updatePanelImage = useCallback((panelId: string, imageIndex: number, newImageUrl: string, newPromptText?: string) => {
+    const panel = panels.find(p => p.id === panelId);
+    if (!panel) {
+      console.error(`Panel not found: ${panelId}`);
+      return;
+    }
+    
+    const updatedImageUrls = [...panel.imageUrls];
+    updatedImageUrls[imageIndex] = newImageUrl;
+    
+    let updatedPromptsUsed = panel.promptsUsed || [];
+    if (newPromptText) {
+      updatedPromptsUsed = [...updatedPromptsUsed];
+      if (updatedPromptsUsed.length <= imageIndex) {
+        // Fill with empty strings up to imageIndex
+        while (updatedPromptsUsed.length < imageIndex) {
+          updatedPromptsUsed.push('');
+        }
+        updatedPromptsUsed.push(newPromptText);
+      } else {
+        updatedPromptsUsed[imageIndex] = newPromptText;
+      }
+    }
+    
+    const updatedPanels = panels.map(p => {
+      if (p.id === panelId) {
+        return { 
+          ...p, 
+          imageUrls: updatedImageUrls,
+          promptsUsed: updatedPromptsUsed
+        };
+      }
+      return p;
+    });
+    
+    updateActiveStoryPanels(updatedPanels);
+    toast({ title: "Image Updated", description: "Panel image has been updated." });
+  }, [panels, toast, updateActiveStoryPanels]);
+
+  const updatePanelImages = useCallback((panelId: string, updates: Array<{ imageIndex: number; newImageUrl: string; newPromptText: string }>) => {
+    const panel = panels.find(p => p.id === panelId);
+    if (!panel) {
+      console.error(`Panel not found: ${panelId}`);
+      return;
+    }
+    
+    const updatedImageUrls = [...panel.imageUrls];
+    let updatedPromptsUsed = [...(panel.promptsUsed || [])];
+    
+    updates.forEach(update => {
+      updatedImageUrls[update.imageIndex] = update.newImageUrl;
+      
+      if (update.newPromptText) {
+        if (updatedPromptsUsed.length <= update.imageIndex) {
+          // Fill with empty strings up to imageIndex
+          while (updatedPromptsUsed.length < update.imageIndex) {
+            updatedPromptsUsed.push('');
+          }
+          updatedPromptsUsed.push(update.newPromptText);
+        } else {
+          updatedPromptsUsed[update.imageIndex] = update.newPromptText;
+        }
+      }
+    });
+    
+    const updatedPanels = panels.map(p => {
+      if (p.id === panelId) {
+        return { 
+          ...p, 
+          imageUrls: updatedImageUrls,
+          promptsUsed: updatedPromptsUsed
+        };
+      }
+      return p;
+    });
+    
+    updateActiveStoryPanels(updatedPanels);
+    toast({ title: "Panel Images Updated", description: "Multiple images in the panel were updated." });
+  }, [panels, toast, updateActiveStoryPanels]);
 
   const processUploadedFiles = (files: File[], description: string) => {
     if (files.length === 0) {
@@ -135,7 +343,6 @@ export default function Main() {
       });
   };
 
-
   const handleOpenGenerateDialog = useCallback((panelId: string) => {
     const panel = getPanel(panelId);
     if (panel) {
@@ -192,7 +399,6 @@ export default function Main() {
     setPanelForEditing(null);
   }, [updatePanelImages]);
 
-
   const renderContent = () => {
     if (isStoryLoading || isProcessingFile) {
       return (
@@ -229,9 +435,8 @@ export default function Main() {
       );
     }
 
-
     return (
-      <FlowchartDisplay
+      <DynamicFlowchart
         panels={panels}
         rootId={rootPanelId} 
         onGenerateNext={handleOpenGenerateDialog}
@@ -243,16 +448,25 @@ export default function Main() {
     );
   };
 
-
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <div className="flex flex-col min-h-screen bg-background text-foreground antialiased">
         <AppHeader 
           onUploadInitialPanel={handleUploadInitialPanel}
           onUploadComicBook={handleUploadComicBook}
-          onNewStory={handleNewStory}
+          onNewStory={resetStory}
           hasStory={!!rootPanelId || panels.length > 0}
           onNavigateHome={navigateToHome}
+          storySelector={
+            <StorySelector
+              storiesCollection={storiesCollection}
+              activeStory={activeStory}
+              onCreateNewStory={createNewStory}
+              onSwitchStory={switchStory}
+              onDeleteStory={deleteStory}
+              onUpdateStoryTitle={updateStoryTitle}
+            />
+          }
         />
         <main className="flex-1 overflow-hidden relative">
           {renderContent()}
