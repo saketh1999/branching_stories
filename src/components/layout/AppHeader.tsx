@@ -68,10 +68,10 @@ const AppHeader: FC<AppHeaderProps> = ({
                 <span className="hidden sm:inline ml-1.5 sm:ml-2 text-xs sm:text-sm">Add Images</span>
               </Button>
             </TooltipWrapper>
-            <TooltipWrapper text="New Story">
+            <TooltipWrapper text="Delete Story">
               <Button variant="destructive" size="icon" className="h-8 w-8 sm:h-9 sm:w-auto sm:px-2 md:px-3" onClick={onNewStory} disabled={!hasStory}>
                 <Trash2 className="h-4 w-4" />
-                <span className="hidden sm:inline ml-1.5 sm:ml-2 text-xs sm:text-sm">New Story</span>
+                <span className="hidden sm:inline ml-1.5 sm:ml-2 text-xs sm:text-sm">Delete Story</span>
               </Button>
             </TooltipWrapper>
           </TooltipProvider>
