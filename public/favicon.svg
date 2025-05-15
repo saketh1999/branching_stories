@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="#FFD700">
+  <!-- Book base - simplified -->
+  <path d="M128 420c50 12 95 16 128 16s78-4 128-16V260c-50 12-95 16-128 16s-78-4-128-16v160z"/>
+  <path d="M256 346l-64-16V210l64 16 64-16v120l-64 16z"/>
+  
+  <!-- Simplified branching structure -->
+  <path d="M256 210v-80c0 0-30-20-60-60s-10-60 0-60 60 0 60 0 30 20 60 60 10 60 0 60"/>
+  
+  <!-- Node circles - simplified to 3 main ones -->
+  <circle cx="175" cy="120" r="15"/>
+  <circle cx="256" cy="50" r="15"/>
+  <circle cx="337" cy="120" r="15"/>
+</svg> 

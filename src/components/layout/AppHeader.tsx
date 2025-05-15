@@ -1,10 +1,11 @@
 import type { FC, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
-import { BookImage, PlusSquare, Trash2, Home } from 'lucide-react';
+import { PlusSquare, Trash2, Home } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle'; 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 interface AppHeaderProps {
   onUploadInitialPanel: () => void;
@@ -29,10 +30,18 @@ const AppHeader: FC<AppHeaderProps> = ({
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 sm:h-16 max-w-full items-center justify-between px-2 sm:px-4 md:px-6 lg:px-8">
         <div className="flex items-center gap-1.5 sm:gap-2">
-          <BookImage 
-            className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-primary cursor-pointer" 
+          <div 
+            className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 cursor-pointer relative" 
             onClick={onNavigateHome}
-          />
+          >
+            <Image 
+              src="/logo.svg" 
+              alt="Branching Tales Logo" 
+              width={32} 
+              height={32}
+              className="w-full h-full text-primary"
+            />
+          </div>
           <h1 
             className="text-lg sm:text-xl md:text-2xl font-bold tracking-tight text-foreground cursor-pointer"
             onClick={onNavigateHome}

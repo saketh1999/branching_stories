@@ -61,14 +61,7 @@ const HomePage: FC<HomePageProps> = ({ onUploadInitial }) => {
                   <FileUp className="mr-2 h-5 w-5 group-hover:-translate-y-1 transition-transform" />
                   Upload Images (Up to 50)
                 </Button>
-                <Button 
-                  size="lg" 
-                  variant="outline" 
-                  className="bg-transparent border-white/20 hover:bg-white/5 text-white rounded-md transition-all"
-                >
-                  <Lightbulb className="mr-2 h-5 w-5 text-[#FFD700]" />
-                  Try Demo
-                </Button>
+                
               </div>
               
               <div className="flex items-center gap-4 text-white/60 text-sm">
@@ -184,8 +177,14 @@ const HomePage: FC<HomePageProps> = ({ onUploadInitial }) => {
         <div className="container mx-auto px-4 sm:px-6">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center gap-2 mb-4 md:mb-0">
-              <div className="relative h-6 w-6 rounded-md overflow-hidden bg-[#FFD700]">
-                <div className="absolute inset-0 flex items-center justify-center text-[#1E1E2F] font-bold text-sm">B</div>
+              <div className="relative h-6 w-6 rounded-md overflow-hidden">
+                <Image 
+                  src="/logo.svg" 
+                  alt="Branching Tales Logo" 
+                  width={24} 
+                  height={24}
+                  className="w-full h-full"
+                />
               </div>
               <span className="font-bold text-base">Branching Tales</span>
             </div>
