@@ -25,52 +25,7 @@ const HomePage: FC<HomePageProps> = ({ onUploadInitial }) => {
 
   return (
     <div className="relative flex flex-col min-h-full bg-[#1E1E2F] text-white overflow-hidden">
-      {/* Navigation */}
-      <nav className="relative z-50 border-b border-white/10 backdrop-blur-sm bg-[#1E1E2F]/80">
-        <div className="container mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center">
-            {/* Logo */}
-            <div className="flex items-center gap-2">
-              <div className="relative h-8 w-8 rounded-md overflow-hidden bg-[#FFD700]">
-                <div className="absolute inset-0 flex items-center justify-center text-[#1E1E2F] font-bold text-xl">B</div>
-              </div>
-              <span className="font-extrabold text-xl tracking-tight">Branching Tales</span>
-            </div>
-          </div>
-          
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-6">
-            <Button variant="link" className="text-white/80 hover:text-white">Home</Button>
-            <Button variant="link" className="text-white/80 hover:text-white">Features</Button>
-            <Button variant="link" className="text-white/80 hover:text-white">Explore</Button>
-            <Button className="bg-[#FFD700] hover:bg-[#FFA500] text-[#1E1E2F] font-medium rounded-md px-4 transition-colors">
-              Get Started
-            </Button>
-          </div>
-          
-          {/* Mobile menu button */}
-          <Button 
-            variant="ghost" 
-            size="icon"
-            className="md:hidden text-white"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          >
-            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </Button>
-        </div>
-        
-        {/* Mobile menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden absolute top-full left-0 right-0 bg-[#1E1E2F] border-b border-white/10 py-4 px-4 sm:px-6 flex flex-col gap-3 z-50">
-            <Button variant="ghost" className="text-white/80 hover:text-white justify-start">Home</Button>
-            <Button variant="ghost" className="text-white/80 hover:text-white justify-start">Features</Button>
-            <Button variant="ghost" className="text-white/80 hover:text-white justify-start">Explore</Button>
-            <Button className="bg-[#FFD700] hover:bg-[#FFA500] text-[#1E1E2F] font-medium rounded-md w-full">
-              Get Started
-            </Button>
-          </div>
-        )}
-      </nav>
+ 
 
       {/* Decorative elements */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
@@ -104,7 +59,7 @@ const HomePage: FC<HomePageProps> = ({ onUploadInitial }) => {
                   onClick={onUploadInitial}
                 >
                   <FileUp className="mr-2 h-5 w-5 group-hover:-translate-y-1 transition-transform" />
-                  Upload First Panel
+                  Upload Images (Up to 50)
                 </Button>
                 <Button 
                   size="lg" 

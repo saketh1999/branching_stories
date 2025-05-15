@@ -1,4 +1,3 @@
-
 import type { FC, ChangeEvent } from 'react';
 import { useState } from 'react';
 import {
@@ -16,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { UploadCloud, Image as ImageIcon } from 'lucide-react';
 import Image from 'next/image';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface UploadInitialPanelDialogProps {
   isOpen: boolean;
@@ -23,7 +23,7 @@ interface UploadInitialPanelDialogProps {
   onUpload: (files: File[], description: string) => void;
 }
 
-const MAX_FILES = 4;
+const MAX_FILES = 50;
 
 const UploadInitialPanelDialog: FC<UploadInitialPanelDialogProps> = ({ isOpen, onClose, onUpload }) => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -58,18 +58,23 @@ const UploadInitialPanelDialog: FC<UploadInitialPanelDialogProps> = ({ isOpen, o
       return;
     }
 
-    setSelectedFiles(imageFiles);
+    // Sort files by name to maintain order
+    const sortedFiles = imageFiles.sort((a, b) => a.name.localeCompare(b.name));
+    setSelectedFiles(sortedFiles);
     
-    const newPreviewUrls: string[] = [];
-    imageFiles.forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        newPreviewUrls.push(reader.result as string);
-        if (newPreviewUrls.length === imageFiles.length) {
-          setPreviewUrls(newPreviewUrls);
-        }
-      };
-      reader.readAsDataURL(file);
+    // Use Promise.all for better performance with many files
+    const fileReadPromises = sortedFiles.map(file => {
+      return new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          resolve(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      });
+    });
+
+    Promise.all(fileReadPromises).then(urls => {
+      setPreviewUrls(urls);
     });
   };
 
@@ -96,11 +101,11 @@ const UploadInitialPanelDialog: FC<UploadInitialPanelDialogProps> = ({ isOpen, o
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="w-full max-w-sm sm:max-w-lg bg-card">
+      <DialogContent className="w-full max-w-sm sm:max-w-lg md:max-w-2xl bg-card">
         <DialogHeader>
-          <DialogTitle className="text-xl sm:text-2xl text-primary">Upload Your First Comic Panel</DialogTitle>
+          <DialogTitle className="text-xl sm:text-2xl text-primary">Upload Your Comic Panels</DialogTitle>
           <DialogDescription className="text-xs sm:text-sm">
-            Choose 1 to {MAX_FILES} image files for the starting panel and add a short description for them.
+            Choose up to {MAX_FILES} image files for your panels and add a description for them. Files will be ordered by filename.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-3 sm:gap-4 py-4">
@@ -119,21 +124,28 @@ const UploadInitialPanelDialog: FC<UploadInitialPanelDialogProps> = ({ isOpen, o
 
           {previewUrls.length > 0 && (
             <div className="mt-2 border border-border rounded-md p-1.5 sm:p-2">
-              <Label className="text-xs sm:text-sm text-muted-foreground mb-1 block">Previews ({previewUrls.length} selected):</Label>
-              <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                {previewUrls.map((url, index) => (
-                  <div key={index} className="aspect-square relative bg-muted rounded overflow-hidden">
-                    <Image 
-                      src={url} 
-                      alt={`Preview ${index + 1}`} 
-                      layout="fill" 
-                      objectFit="contain" 
-                      data-ai-hint="comic preview small"
-                      sizes="(max-width: 640px) 45vw, 200px"
+              <Label className="text-xs sm:text-sm text-muted-foreground mb-1 block">
+                Previews ({previewUrls.length} selected)
+              </Label>
+              <ScrollArea className="h-60 w-full">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5 sm:gap-2 p-1">
+                  {previewUrls.map((url, index) => (
+                    <div key={index} className="aspect-square relative bg-muted rounded overflow-hidden group">
+                      <div className="absolute top-1 left-1 bg-black/50 text-white text-xs px-1.5 py-0.5 rounded-sm z-10">
+                        {index + 1}
+                      </div>
+                      <Image 
+                        src={url} 
+                        alt={`Preview ${index + 1}`} 
+                        layout="fill" 
+                        objectFit="contain" 
+                        data-ai-hint="comic preview small"
+                        sizes="(max-width: 640px) 45vw, 200px"
                       />
-                  </div>
-                ))}
-              </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
             </div>
           )}
 
@@ -145,7 +157,7 @@ const UploadInitialPanelDialog: FC<UploadInitialPanelDialogProps> = ({ isOpen, o
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="text-foreground text-sm"
-              rows={2}
+              rows={3}
             />
           </div>
         </div>
@@ -154,7 +166,7 @@ const UploadInitialPanelDialog: FC<UploadInitialPanelDialogProps> = ({ isOpen, o
             <Button type="button" variant="outline" onClick={handleClose} className="w-full sm:w-auto">Cancel</Button>
           </DialogClose>
           <Button type="submit" onClick={handleSubmit} disabled={selectedFiles.length === 0 || !description.trim()} className="w-full sm:w-auto">
-            <UploadCloud className="mr-2 h-4 w-4" /> Upload Panel Images
+            <UploadCloud className="mr-2 h-4 w-4" /> Upload {selectedFiles.length} Panel{selectedFiles.length !== 1 ? 's' : ''}
           </Button>
         </DialogFooter>
       </DialogContent>
