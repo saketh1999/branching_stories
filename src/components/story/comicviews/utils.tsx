@@ -3,12 +3,12 @@
  */
 
 import type { FC, KeyboardEvent, ReactElement } from 'react';
-import { cloneElement, useState } from 'react';
+import { cloneElement, useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { RefreshCcw, Check, X, Play, Loader2 } from 'lucide-react';
+import { RefreshCcw, Check, X, Play, Loader2, Eye, Maximize2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -225,6 +225,26 @@ export const AnimatedImageDisplay: FC<AnimatedImageDisplayProps> = ({ url, alt, 
   const [isLoading, setIsLoading] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showImagePopup, setShowImagePopup] = useState(false);
+  
+  // Close popup when clicking outside
+  const popupRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
+        setShowImagePopup(false);
+      }
+    };
+    
+    if (showImagePopup) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showImagePopup]);
 
   const handleAnimateClick = async (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent triggering the parent onClick
@@ -278,6 +298,11 @@ export const AnimatedImageDisplay: FC<AnimatedImageDisplayProps> = ({ url, alt, 
     } finally {
       setIsLoading(false);
     }
+  };
+  
+  const handleViewImageClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent triggering the parent onClick
+    setShowImagePopup(true);
   };
 
   return (
@@ -358,10 +383,60 @@ export const AnimatedImageDisplay: FC<AnimatedImageDisplayProps> = ({ url, alt, 
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
+          
+          {/* View Image Button */}
+          <TooltipProvider>
+            <Tooltip delayDuration={100}>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="secondary" 
+                  size="sm" 
+                  onClick={handleViewImageClick}
+                  className="absolute bottom-2 left-2 shadow-md"
+                >
+                  <Eye className="h-4 w-4 mr-1" />
+                  View
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p>View full size image</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
 
           {error && (
             <div className="absolute bottom-12 right-2 left-2 bg-red-500 text-white px-2 py-1 rounded text-xs overflow-auto max-h-24">
               {error}
+            </div>
+          )}
+          
+          {/* Image Popup */}
+          {showImagePopup && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setShowImagePopup(false)}>
+              <div 
+                ref={popupRef}
+                className="relative bg-black max-w-[600px] max-h-[80vh] rounded-md overflow-hidden shadow-xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setShowImagePopup(false)}
+                  className="absolute top-2 right-2 z-10 bg-black/50 hover:bg-black/70 text-white h-8 w-8"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+                <div className="relative w-full h-[500px]">
+                  <Image
+                    src={url}
+                    alt={alt}
+                    layout="fill"
+                    objectFit="contain"
+                    unoptimized={isExternalImage(url)}
+                    className="object-contain"
+                  />
+                </div>
+              </div>
             </div>
           )}
         </>

@@ -1,13 +1,14 @@
 "use client";
 
-import React, { FC, useState } from 'react';
+import React, { FC, useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { RefreshCcw, Check, X, Sparkles, GitFork, FileImage, Edit2, BookText, Info, Maximize2, Minimize2, Video } from 'lucide-react';
+import { RefreshCcw, Check, X, Sparkles, GitFork, FileImage, Edit2, BookText, Info, Maximize2, Minimize2, Video, View, Eye } from 'lucide-react';
 import type { ComicPanelData } from '@/types/story';
 import PanelAnimationButton from './PanelAnimationButton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from '@/lib/utils';
+import Image from 'next/image';
 
 // Add a panel animations map to store blob URLs
 const panelAnimations = new Map<string, string>();
@@ -101,6 +102,41 @@ export const RegularPanelView: FC<RegularPanelViewProps> = ({
 }) => {
   const [showDescription, setShowDescription] = useState(false);
   const [hasAnimation, setHasAnimation] = useState(panelAnimations.has(panel.id));
+  const [showImagePopup, setShowImagePopup] = useState(false);
+  const [selectedImage, setSelectedImage] = useState({ url: "", prompt: "" });
+  
+  // Popup reference for click outside handling
+  const popupRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
+        setShowImagePopup(false);
+      }
+    };
+    
+    if (showImagePopup) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showImagePopup]);
+  
+  // Handle view image click
+  const handleViewImage = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Use the first image from the panel
+    if (panel.imageUrls.length > 0) {
+      setSelectedImage({
+        url: panel.imageUrls[0],
+        prompt: panel.promptsUsed?.[0] || displayTitle
+      });
+      setShowImagePopup(true);
+    }
+  };
   
   // Handle when a video is generated
   const handleVideoGenerated = (blobUrl: string) => {
@@ -220,6 +256,15 @@ export const RegularPanelView: FC<RegularPanelViewProps> = ({
           <GitFork className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
           Branch
         </Button>
+        <Button 
+          onClick={handleViewImage} 
+          size="sm" 
+          variant="outline"
+          className="text-xs sm:text-sm"
+        >
+          <Eye className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
+          View
+        </Button>
         {hasAnimation && (
           <Button 
             onClick={() => window.open(panelAnimations.get(panel.id), '_blank')}
@@ -232,6 +277,33 @@ export const RegularPanelView: FC<RegularPanelViewProps> = ({
           </Button>
         )}
       </CardFooter>
+      
+      {/* Image Popup */}
+      {showImagePopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setShowImagePopup(false)}>
+          <div 
+            ref={popupRef}
+            className="relative bg-black max-w-[600px] max-h-[80vh] rounded-md overflow-hidden shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setShowImagePopup(false)}
+              className="absolute top-2 right-2 z-10 bg-black/50 hover:bg-black/70 text-white h-8 w-8"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+            <div className="relative w-full h-[500px]">
+              <img
+                src={selectedImage.url}
+                alt={selectedImage.prompt}
+                className="w-full h-full object-contain"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   );
 };

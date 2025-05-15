@@ -1,10 +1,12 @@
 import type { FC, KeyboardEvent } from 'react';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { BookText, Sparkles, GitFork, Edit3, Info, ChevronsUp, ChevronsDown, LayoutGrid, Rows3 } from 'lucide-react';
+import { BookText, Sparkles, GitFork, Edit3, Info, ChevronsUp, ChevronsDown, LayoutGrid, Rows3, Eye, X } from 'lucide-react';
 import Image from 'next/image';
 import type { ComicPanelData } from '@/types/story';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 import { TooltipButton, ActionButtonProps, isExternalImage } from './utils';
 import { PanelHeaderStandard, PanelActionsFooter } from './layout';
@@ -50,6 +52,26 @@ const GroupNodeView: FC<GroupNodeViewProps> = ({
   // Layout state
   const [gridLayout, setGridLayout] = useState(true);
   const [gridColumns, setGridColumns] = useState(3);
+  const [viewImagePopup, setViewImagePopup] = useState<{url: string, alt: string} | null>(null);
+  
+  // Close popup when clicking outside
+  const popupRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
+        setViewImagePopup(null);
+      }
+    };
+    
+    if (viewImagePopup) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [viewImagePopup]);
 
   // Get child comic book pages sorted by page number
   const childComicBookPages = panel.childrenIds
@@ -69,6 +91,12 @@ const GroupNodeView: FC<GroupNodeViewProps> = ({
     if (onSelectPage) {
       onSelectPage(pageId);
     }
+  };
+  
+  // Handle view image click
+  const handleViewImage = (e: React.MouseEvent, url: string, alt: string) => {
+    e.stopPropagation(); // Prevent triggering the parent onClick
+    setViewImagePopup({ url, alt });
   };
 
   // Toggle between grid and list view
@@ -183,6 +211,25 @@ const GroupNodeView: FC<GroupNodeViewProps> = ({
                 <div className="absolute top-0 right-0 bg-black/50 text-white text-xs font-bold py-1 px-2 rounded-bl-md">
                   {page.pageNumber}
                 </div>
+                {/* View Image Button */}
+                <TooltipProvider>
+                  <Tooltip delayDuration={100}>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="absolute bottom-2 right-2 bg-secondary/80 shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => handleViewImage(e, page.imageUrls[0], page.title || `Page ${page.pageNumber}`)}
+                      >
+                        <Eye className="h-3.5 w-3.5 mr-1" />
+                        View
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <p>View full size image</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             ))}
           </div>
@@ -201,6 +248,36 @@ const GroupNodeView: FC<GroupNodeViewProps> = ({
           }
         </div>
       </div>
+
+      {/* Image Popup */}
+      {viewImagePopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setViewImagePopup(null)}>
+          <div 
+            ref={popupRef}
+            className="relative bg-black max-w-[600px] max-h-[80vh] rounded-md overflow-hidden shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setViewImagePopup(null)}
+              className="absolute top-2 right-2 z-10 bg-black/50 hover:bg-black/70 text-white h-8 w-8"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+            <div className="relative w-full h-[500px]">
+              <Image
+                src={viewImagePopup.url}
+                alt={viewImagePopup.alt}
+                layout="fill"
+                objectFit="contain"
+                unoptimized={isExternalImage(viewImagePopup.url)}
+                className="object-contain"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   );
 };
