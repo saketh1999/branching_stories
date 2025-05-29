@@ -1,60 +1,23 @@
 # Branching Stories Comic Creator
 
-An interactive application for creating branching comic stories with AI-generated images.
+## Welcome to Branching Stories
 
-## Features
+<img width="929" alt="image" src="https://github.com/user-attachments/assets/42819d01-db67-494e-a5be-e4d61c2e4504" />
 
-- Generate comic panels with AI
-- Create branching storylines 
-- Visualize story flow
-- Multiple AI model options (Gemini and ChatGPT/DALL-E)
-- Persistent image storage with Vercel Blob
+## Adding Comic Images
 
-## Setting Up Vercel Blob Storage
+<img width="416" alt="image" src="https://github.com/user-attachments/assets/3ed5fb8a-e838-4181-8b18-50be4add74d0" />
 
-This application uses Vercel Blob Storage for image persistence. To set it up:
+## Comic Page
 
-1. Create a `.env.local` file at the root of the project with:
+<img width="1505" alt="image" src="https://github.com/user-attachments/assets/e12af8a9-5346-4078-9a19-b47a044fd7b5" />
 
-```env
-# Vercel Blob storage configuration
-BLOB_READ_WRITE_TOKEN="your-read-write-token"
+## Braching modal
 
-# If you're testing locally with a store created in the Vercel dashboard, use:
-# BLOB_STORE_ID="your-store-id"
+<img width="686" alt="image" src="https://github.com/user-attachments/assets/abce49a8-fc8e-4e07-ac29-168eec36e0df" />
 
-# Or for a quickstart, leave empty to automatically create a store
-BLOB_STORE_ID=""
+## Animation Modal
 
-# OpenAI API key
-OPENAI_API_KEY="your-openai-api-key"
-```
+<img width="686" alt="image" src="https://github.com/user-attachments/assets/2c25dd52-05f2-4774-aa74-fd4fdafeafe5" />
 
-2. Get a Blob read-write token:
-   - If deploying on Vercel: The token is automatically available
-   - For local development: Create a token in the Vercel dashboard under your project's "Storage" tab
 
-3. (Optional) Create a Blob store:
-   - Go to the Vercel dashboard > Storage tab
-   - Create a new Blob store
-   - Copy the Store ID to your .env.local file
-
-## Development
-
-```bash
-# Install dependencies
-npm install
-
-# Run development server
-npm run dev
-```
-
-## Technology Stack
-
-- Next.js
-- React
-- Tailwind CSS
-- Google Gemini API
-- OpenAI API (GPT-4o and DALL-E)
-- Vercel Blob Storage
-- TypeScript
